@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart Movie/Series Google Search (TMDb) + Settings Panel
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2.1
+// @version      1.1.4
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features. Keys persist via GM storage.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -66,6 +66,8 @@
   /* nicer selects for season/episode controls */
   #tmdb-play-controls select{background:#071221;color:#e9f1f7;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;font-weight:600}
   #tmdb-play-controls button{vertical-align:middle}
+  .tmdb-play-controls select{background:#071221;color:#e9f1f7;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 8px;font-weight:600}
+  .tmdb-play-controls button{vertical-align:middle}
 
     #tmdb-button{margin:10px 0;padding:8px 12px;background:rgb(3,37,65);color:#1bb8d9;border:1px solid #1bb8d9;border-radius:4px;cursor:pointer;font-weight:bold;user-select:none}
     #tmdb-button:hover{background:#1bb8d9;color:rgb(3,37,65);border-color:rgb(3,37,65)}
@@ -533,6 +535,43 @@
     return key;
   }
 
+  // Process a single TMDb search result: fetch IMDb id, optional YTS torrents, then render
+  async function processSearchResult(result) {
+    const tmdbURL = `https://api.themoviedb.org/3/`;
+    const ytsAPI = `https://yts.mx/api/v2/list_movies.json?query_term=`;
+    try {
+      // remove any existing info card before rendering the new one
+      const existing = parent.querySelector('.tmdb-info-card');
+      if (existing) existing.remove();
+
+      const apiKey = getNextApiKey();
+      const imdbResp = await fetch(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
+      const imdb_id = (await imdbResp.json()).imdb_id;
+
+      if (result.media_type === 'movie') {
+        if (SETTINGS.enableYtsTorrents) {
+          try {
+            const magnet = await fetch(`${ytsAPI}${imdb_id}`);
+            const magnetData = await magnet.json();
+            if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
+              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id);
+            } else {
+              renderInfoBox(result, null, imdb_id);
+            }
+          } catch { renderInfoBox(result, null, imdb_id); }
+        } else {
+          renderInfoBox(result, null, imdb_id);
+        }
+      } else {
+        renderInfoBox(result, null, imdb_id);
+      }
+
+      if (SETTINGS.showCertifications) addCertificationAsync(result.id, result.media_type);
+    } catch (err) {
+      showNotification('Failed to process selected result');
+    }
+  }
+
   async function fetchWithFallback(title, maxRetries = apiKeys.length) {
     let attempts = 0;
     while (attempts < maxRetries) {
@@ -544,27 +583,77 @@
         const response = await fetch(url);
         const data = await response.json();
         if (data.results && data.results.length > 0) {
-          const imdb_id_url = `${tmdbURL}${data.results[0].media_type}/${data.results[0].id}/external_ids?api_key=${apiKey}`;
-          const imdb = await fetch(imdb_id_url);
-          const imdb_id = (await imdb.json()).imdb_id;
-          if (data.results[0].media_type === 'movie') {
-            if (SETTINGS.enableYtsTorrents) {
-              try {
-                const magnet = await fetch(`${ytsAPI}${imdb_id}`);
-                const magnetData = await magnet.json();
-                if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
-                  renderInfoBox(data.results[0], magnetData.data.movies[0].torrents, imdb_id);
-                } else {
-                  renderInfoBox(data.results[0], null, imdb_id);
-                }
-              } catch { renderInfoBox(data.results[0], null, imdb_id); }
-            } else {
-              renderInfoBox(data.results[0], null, imdb_id);
-            }
-          } else {
-            renderInfoBox(data.results[0], null, imdb_id);
+          // Always process the first result automatically
+          const res = data.results[0];
+          await processSearchResult(res);
+
+          // If there are multiple results, show a "Change result" button on the details card
+          if (data.results.length > 1) {
+            try {
+              // keep a stable reference to the results so re-attached buttons/selectors can use them
+              const results = data.results;
+
+              // helper: attach a change-result button to the current info card (if present)
+              function attachChangeButtonToCurrentCard() {
+                try {
+                  const infoCard = parent.querySelector('.tmdb-info-card');
+                  if (!infoCard) return;
+                  const detailsDiv = infoCard.querySelector('#tmdb-details');
+                  if (!detailsDiv) return;
+                  // don't duplicate button
+                  if (detailsDiv.querySelector('#tmdb-change-result-btn')) return;
+
+                  const changeBtn = document.createElement('button');
+                  changeBtn.id = 'tmdb-change-result-btn';
+                  changeBtn.className = 'tmdb-btn ghost';
+                  changeBtn.style.marginTop = '8px';
+                  changeBtn.textContent = 'Change result';
+
+                  const stremioWrapper = detailsDiv.querySelector('a[href^="stremio://detail/"]')?.parentNode || null;
+                  if (stremioWrapper) detailsDiv.insertBefore(changeBtn, stremioWrapper);
+                  else detailsDiv.appendChild(changeBtn);
+
+                  // show an in-card selector when clicked
+                  changeBtn.addEventListener('click', () => {
+                    // toggle existing selector inside this details div
+                    const existingSel = detailsDiv.querySelector('.tmdb-result-selector');
+                    if (existingSel) { existingSel.remove(); return; }
+
+                    const selWrap = document.createElement('div');
+                    selWrap.className = 'tmdb-info-card tmdb-play-controls tmdb-result-selector';
+                    selWrap.style.padding = '10px';
+                    selWrap.innerHTML = `<div style="font-weight:bold;margin-bottom:6px">Select a different TMDb result</div>`;
+
+                    const sel = document.createElement('select');
+                    sel.style.width = '100%';
+                    sel.style.marginBottom = '8px';
+                    results.forEach((r, idx) => {
+                      const opt = document.createElement('option');
+                      const year = (r.release_date || r.first_air_date || '').slice(0, 4) || '----';
+                      opt.value = idx;
+                      opt.text = `${(r.media_type || '').toUpperCase()} — ${r.title || r.name} (${year})`;
+                      sel.appendChild(opt);
+                    });
+
+                    sel.addEventListener('change', async () => {
+                      const idx = parseInt(sel.value, 10);
+                      const chosen = results[idx];
+                      selWrap.remove();
+                      await processSearchResult(chosen);
+                      // after re-rendering, attach the change button again into the new card
+                      attachChangeButtonToCurrentCard();
+                    });
+
+                    selWrap.appendChild(sel);
+                    detailsDiv.insertBefore(selWrap, changeBtn.nextSibling);
+                  });
+                } catch (innerErr) { /* ignore attach errors */ }
+              }
+
+              // initial attach into the currently rendered card
+              attachChangeButtonToCurrentCard();
+            } catch (e) { /* ignore selector injection errors */ }
           }
-          if (SETTINGS.showCertifications) addCertificationAsync(data.results[0].id, data.results[0].media_type);
           return;
         } else {
           showNotification('No results found. Rotating API key...');
