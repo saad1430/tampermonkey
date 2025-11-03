@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart Movie/Series Google Search (TMDb) + Settings Panel
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4.1
+// @version      1.1.5
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features. Keys persist via GM storage.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -74,6 +74,12 @@
   /* floating settings button */
   #tmdb-fab-settings{position:fixed;right:14px;bottom:14px;width:44px;height:44px;border-radius:50%;background:#1bb8d9;color:#062538;border:none;box-shadow:0 6px 18px rgba(0,0,0,.35);z-index:1000000;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px}
   #tmdb-fab-settings:hover{transform:scale(1.05)}
+  /* trailer button + modal */
+  .tmdb-trailer-btn{margin-left:8px}
+  .tmdb-trailer-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000001;display:flex;align-items:center;justify-content:center}
+  .tmdb-trailer-content{width:min(960px,94vw);height:min(540px,76vh);background:#000;border-radius:8px;overflow:hidden;position:relative}
+  .tmdb-trailer-content iframe{width:100%;height:100%;border:0;background:#000}
+  .tmdb-trailer-close{position:absolute;right:8px;top:8px;z-index:10;background:rgba(255,255,255,.06);border:none;color:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
   `);
 
   /* ----------------------------------------------------
@@ -373,6 +379,66 @@
 
     tmdb_id?.addEventListener('click', () => { GM_setClipboard(tmdbID, 'text'); showNotification('TMDB id copied to clipboard'); });
     imdb_id?.addEventListener('click', () => { if (imdb) { GM_setClipboard(imdb, 'text'); showNotification('IMDB id copied to clipboard'); } });
+
+    // add a Watch Trailer button next to the TMDb link (fetches videos endpoint and shows modal)
+    try {
+      const tmdbLink = container.querySelector(`#tmdb-details a[href*="themoviedb.org/${vidType}/${tmdbID}"]`);
+      if (tmdbLink) {
+        const trailerBtn = document.createElement('button');
+        trailerBtn.className = 'tmdb-btn ghost tmdb-trailer-btn';
+        trailerBtn.textContent = 'Watch trailer';
+        trailerBtn.type = 'button';
+        tmdbLink.parentNode.insertBefore(trailerBtn, tmdbLink.nextSibling);
+
+        trailerBtn.addEventListener('click', async () => {
+          // prevent multiple overlays
+          if (document.querySelector('.tmdb-trailer-modal')) return;
+          trailerBtn.disabled = true; trailerBtn.textContent = 'Loading...';
+          try {
+            const apiKey = getNextApiKey();
+            const kind = (Type === 'tv') ? 'tv' : 'movie';
+            const resp = await fetch(`https://api.themoviedb.org/3/${kind}/${tmdbID}/videos?api_key=${apiKey}`);
+            const vids = await resp.json();
+            const results = Array.isArray(vids.results) ? vids.results : [];
+            // prefer official YouTube trailers, then any YouTube trailer
+            let chosen = results.find(r => r.site === 'YouTube' && /trailer/i.test(r.type) && /official/i.test(r.name))
+              || results.find(r => r.site === 'YouTube' && /trailer/i.test(r.type))
+              || results.find(r => r.site === 'YouTube');
+            if (!chosen) { showNotification('No trailer found'); trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer'; return; }
+
+            // build modal
+            const overlay = document.createElement('div');
+            overlay.className = 'tmdb-trailer-modal';
+            overlay.tabIndex = -1;
+            const content = document.createElement('div');
+            content.className = 'tmdb-trailer-content';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'tmdb-trailer-close';
+            closeBtn.innerText = '✕';
+            closeBtn.title = 'Close';
+            closeBtn.addEventListener('click', () => { overlay.remove(); });
+
+            const iframe = document.createElement('iframe');
+            // no autoplay — user must press play
+            iframe.src = `https://www.youtube.com/embed/${chosen.key}?rel=0`;
+            iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            iframe.allowFullscreen = true;
+
+            content.appendChild(closeBtn);
+            content.appendChild(iframe);
+            overlay.appendChild(content);
+            // close on outside click
+            overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+            trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer';
+          } catch (err) {
+            showNotification('Failed to load trailer');
+            trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer';
+          }
+        });
+      }
+    } catch (e) { /* ignore trailer UI errors */ }
 
     // If TV: show a single button (before Stremio link) to "Play another episode".
     // Clicking it will fetch seasons, allow selecting season+episode, validate against the season endpoint,
