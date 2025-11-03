@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart Movie/Series Google Search (TMDb) + Settings Panel
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
+// @version      1.1.4.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features. Keys persist via GM storage.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -319,16 +319,15 @@
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidFast.pro ↗</a><br/>
           <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Smashy.stream ↗</a><br/>
-          <a href="https://embed.su/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Embed.su (slowest) ↗</a><br/>
         </div>` : ''}
 
         ${SETTINGS.enableFrontendLinks ? `
         <div style="margin-top:6px;">
           <strong>Watch on frontends:</strong><br/>
-          <a href="https://www.cineby.app/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby.app</a>
-          <a href="https://www.cineby.app/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://flixer.su/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Flixer.su ↗</a>
-          <a href="https://flixer.su/?${vidType}=${title}&id=${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://www.cineby.gd/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby.gd</a>
+          <a href="https://www.cineby.gd/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://flixer.sh/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Flixer.sh ↗</a>
+          <a href="https://flixer.sh/?${vidType}=${title}&id=${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
           <a href="https://veloratv.ru/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VeloraTV.ru ↗</a><br/>
           <a href="https://xprime.tv/watch/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on xprime.tv ↗</a><br/>
         </div>` : ''}
