@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Smart Movie/Series Google Search (TMDb) + Settings Panel
+// @name         Enhance Movie/Series Search
 // @namespace    http://tampermonkey.net/
-// @version      1.1.5
-// @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features. Keys persist via GM storage.
+// @version      1.2
+// @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
 // @match        https://www.bing.com/search*
@@ -21,7 +21,7 @@
    * -------------------------------------------------- */
   const DEFAULT_SETTINGS = {
     autoDetectOnSERP: true,          // auto-run on media-like SERP
-    enableNotifications: true,
+    enableNotifications: true,       // toast notifications
     enableStreamingLinks: true,      // the big list of watch links
     enableFrontendLinks: true,       // cineby/flixer/velora/etc
     enableTorrentSiteShortcuts: true,// 1337x, EZTV, etc
@@ -29,6 +29,8 @@
     enableStremioLink: true,         // stremio:// deep link
     enableTraktLink: true,           // show Trakt search link under IMDb
     enableEpisodeSelection: true,    // allow changing episode number when playing TV
+    enableTrailerButton: true,       // show Watch trailer button
+    enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true         // fetch + display MPAA/TV rating
   };
 
@@ -77,7 +79,9 @@
   /* trailer button + modal */
   .tmdb-trailer-btn{margin-left:8px}
   .tmdb-trailer-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000001;display:flex;align-items:center;justify-content:center}
-  .tmdb-trailer-content{width:min(960px,94vw);height:min(540px,76vh);background:#000;border-radius:8px;overflow:hidden;position:relative}
+  /* make modal ~85% of screen width and height managed automatically via aspect-ratio
+    cap height to 85vh to keep it visible on small screens */
+  .tmdb-trailer-content{width:80vw;max-width:1900px;aspect-ratio:16/9;height:auto;max-height:95vh;background:#000;border-radius:8px;overflow:hidden;position:relative}
   .tmdb-trailer-content iframe{width:100%;height:100%;border:0;background:#000}
   .tmdb-trailer-close{position:absolute;right:8px;top:8px;z-index:10;background:rgba(255,255,255,.06);border:none;color:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
   `);
@@ -179,6 +183,8 @@
           ${checkbox('enableStremioLink', 'Show “Open in Stremio” link', SETTINGS.enableStremioLink)}
           ${checkbox('enableTraktLink', 'Show Trakt link', SETTINGS.enableTraktLink)}
           ${checkbox('enableEpisodeSelection', 'Allow changing episode number when playing TV', SETTINGS.enableEpisodeSelection)}
+          ${checkbox('enableTrailerButton', 'Show "Watch trailer" button', SETTINGS.enableTrailerButton)}
+          ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
 
           <div class="full">
@@ -189,7 +195,6 @@
           </div>
         </div>
         <footer>
-          <button class="tmdb-btn ghost" id="tmdb-reset-keys">Reset Keys</button>
           <button class="tmdb-btn primary" id="tmdb-save">Save & Apply</button>
         </footer>
       </div>`;
@@ -198,9 +203,6 @@
     document.body.appendChild(overlay);
 
     document.getElementById('tmdb-close').onclick = closeSettingsPanel;
-    document.getElementById('tmdb-reset-keys').onclick = () => {
-      if (confirm('Clear stored TMDb API keys?')) { GM_deleteValue('tmdb_api_keys'); showNotification('Keys cleared. Reload the page and re-enter keys.', 7000); }
-    };
     document.getElementById('tmdb-save').onclick = () => {
       const next = { ...SETTINGS };
       Object.keys(DEFAULT_SETTINGS).forEach(k => {
@@ -383,7 +385,7 @@
     // add a Watch Trailer button next to the TMDb link (fetches videos endpoint and shows modal)
     try {
       const tmdbLink = container.querySelector(`#tmdb-details a[href*="themoviedb.org/${vidType}/${tmdbID}"]`);
-      if (tmdbLink) {
+      if (tmdbLink && SETTINGS.enableTrailerButton) {
         const trailerBtn = document.createElement('button');
         trailerBtn.className = 'tmdb-btn ghost tmdb-trailer-btn';
         trailerBtn.textContent = 'Watch trailer';
@@ -395,8 +397,18 @@
           if (document.querySelector('.tmdb-trailer-modal')) return;
           trailerBtn.disabled = true; trailerBtn.textContent = 'Loading...';
           try {
-            const apiKey = getNextApiKey();
             const kind = (Type === 'tv') ? 'tv' : 'movie';
+            const cacheKey = `${kind}:${tmdbID}`;
+            // if cached (including negative cache), use it
+            if (trailerCache.has(cacheKey)) {
+              const cached = trailerCache.get(cacheKey);
+              if (!cached) { showNotification('No trailer found'); trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer'; return; }
+              showTrailerModal(cached.key);
+              trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer';
+              return;
+            }
+
+            const apiKey = getNextApiKey();
             const resp = await fetch(`https://api.themoviedb.org/3/${kind}/${tmdbID}/videos?api_key=${apiKey}`);
             const vids = await resp.json();
             const results = Array.isArray(vids.results) ? vids.results : [];
@@ -404,33 +416,13 @@
             let chosen = results.find(r => r.site === 'YouTube' && /trailer/i.test(r.type) && /official/i.test(r.name))
               || results.find(r => r.site === 'YouTube' && /trailer/i.test(r.type))
               || results.find(r => r.site === 'YouTube');
+
+            // store in cache (either chosen object or null for not found)
+            trailerCache.set(cacheKey, chosen || null);
+
             if (!chosen) { showNotification('No trailer found'); trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer'; return; }
 
-            // build modal
-            const overlay = document.createElement('div');
-            overlay.className = 'tmdb-trailer-modal';
-            overlay.tabIndex = -1;
-            const content = document.createElement('div');
-            content.className = 'tmdb-trailer-content';
-
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'tmdb-trailer-close';
-            closeBtn.innerText = '✕';
-            closeBtn.title = 'Close';
-            closeBtn.addEventListener('click', () => { overlay.remove(); });
-
-            const iframe = document.createElement('iframe');
-            // no autoplay — user must press play
-            iframe.src = `https://www.youtube.com/embed/${chosen.key}?rel=0`;
-            iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-            iframe.allowFullscreen = true;
-
-            content.appendChild(closeBtn);
-            content.appendChild(iframe);
-            overlay.appendChild(content);
-            // close on outside click
-            overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
-            document.body.appendChild(overlay);
+            showTrailerModal(chosen.key);
             trailerBtn.disabled = false; trailerBtn.textContent = 'Watch trailer';
           } catch (err) {
             showNotification('Failed to load trailer');
@@ -600,6 +592,37 @@
     return key;
   }
 
+  // simple in-memory cache for trailers to avoid repeated TMDb video requests
+  const trailerCache = new Map(); // key -> { key: youtubeKey } or null if none
+
+  // helper to open trailer modal by YouTube key
+  function showTrailerModal(youtubeKey) {
+    if (!youtubeKey) return;
+    if (document.querySelector('.tmdb-trailer-modal')) return; // already open
+    const overlay = document.createElement('div');
+    overlay.className = 'tmdb-trailer-modal';
+    overlay.tabIndex = -1;
+    const content = document.createElement('div');
+    content.className = 'tmdb-trailer-content';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tmdb-trailer-close';
+    closeBtn.innerText = '✕';
+    closeBtn.title = 'Close';
+    closeBtn.addEventListener('click', () => { overlay.remove(); });
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${youtubeKey}?rel=0`;
+    iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    iframe.allowFullscreen = true;
+
+    content.appendChild(closeBtn);
+    content.appendChild(iframe);
+    overlay.appendChild(content);
+    overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
   // Process a single TMDb search result: fetch IMDb id, optional YTS torrents, then render
   async function processSearchResult(result) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
@@ -653,10 +676,11 @@
           await processSearchResult(res);
 
           // If there are multiple results, show a "Change result" button on the details card
-          if (data.results.length > 1) {
+          if (data.results.length > 1 && SETTINGS.enableChangeResultButton) {
             try {
-              // keep a stable reference to the results so re-attached buttons/selectors can use them
-              const results = data.results;
+              // only allow movies and tv shows in the change-result selector (exclude person entries)
+              const results = (data.results || []).filter(r => r && (r.media_type === 'movie' || r.media_type === 'tv'));
+              if (!results || results.length === 0) { /* nothing to show */ return; }
 
               // helper: attach a change-result button to the current info card (if present)
               function attachChangeButtonToCurrentCard() {
@@ -672,6 +696,7 @@
                   changeBtn.id = 'tmdb-change-result-btn';
                   changeBtn.className = 'tmdb-btn ghost';
                   changeBtn.style.marginTop = '8px';
+                  changeBtn.style.marginLeft = '5px';
                   changeBtn.textContent = 'Change result';
 
                   const stremioWrapper = detailsDiv.querySelector('a[href^="stremio://detail/"]')?.parentNode || null;
@@ -685,7 +710,7 @@
                     if (existingSel) { existingSel.remove(); return; }
 
                     const selWrap = document.createElement('div');
-                    selWrap.className = 'tmdb-info-card tmdb-play-controls tmdb-result-selector';
+                    selWrap.className = 'tmdb-result-selector';
                     selWrap.style.padding = '10px';
                     selWrap.innerHTML = `<div style="font-weight:bold;margin-bottom:6px">Select a different TMDb result</div>`;
 
