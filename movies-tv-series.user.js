@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Enhance Movie/Series Search
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.2.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
