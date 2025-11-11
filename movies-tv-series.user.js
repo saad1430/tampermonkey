@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name         Enhance Movie/Series Search
+// @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
 // @match        https://www.bing.com/search*
-// @match        https://www.themoviedb.org/*
 // @match        https://www.imdb.com/title/*
+// @match        https://imdb.com/title/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -32,6 +32,7 @@
     enableTraktLink: true,           // show Trakt search link under IMDb
     enableEpisodeSelection: true,    // allow changing episode number when playing TV
     enableTrailerButton: true,       // show Watch trailer button
+    enableTrailerAutoPlay: false,    // auto-play trailer when opened
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true,        // fetch + display MPAA/TV rating
     enableOnImdbPage: true,          // enable features on IMDb title pages
@@ -195,6 +196,7 @@
           ${checkbox('enableTraktLink', 'Show Trakt link', SETTINGS.enableTraktLink)}
           ${checkbox('enableEpisodeSelection', 'Allow changing episode number when playing TV', SETTINGS.enableEpisodeSelection)}
           ${checkbox('enableTrailerButton', 'Show "Watch trailer" button', SETTINGS.enableTrailerButton)}
+          ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
           ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
@@ -589,7 +591,7 @@
         const hiddenIFrame = document.createElement('iframe');
         hiddenIFrame.style.display = 'none'; hiddenIFrame.src = href; document.body.appendChild(hiddenIFrame);
         let redirected = false;
-        const timeout = setTimeout(() => { if (!redirected) window.location.href = 'https://www.stremio.com/downloads'; }, 5000);
+        const timeout = setTimeout(() => { if (!redirected) window.location.href = 'https://www.stremio.com/downloads'; }, 7000);
         window.onblur = function () { clearTimeout(timeout); redirected = true; hiddenIFrame.remove(); };
       });
     }
@@ -624,8 +626,11 @@
     closeBtn.addEventListener('click', () => { overlay.remove(); });
 
     const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${youtubeKey}?rel=0`;
-    iframe.allow = 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    // Build src with autoplay when enabled in settings. Adding mute=1 improves autoplay reliability
+    const autoplayParam = SETTINGS.enableTrailerAutoPlay ? '&autoplay=1&mute=0' : '';
+    iframe.src = `https://www.youtube.com/embed/${youtubeKey}?rel=0${autoplayParam}`;
+    // include autoplay in allow so browsers that respect the attribute may permit it
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
     iframe.allowFullscreen = true;
 
     content.appendChild(closeBtn);
@@ -832,9 +837,159 @@
     if (btn) btn.style.display = 'none';
   }
 
-  function imdbHandler() {
-    showNotification('IMDB page detected!', 10000);
+  /* ----------------------------------------------------
+ * IMDb Page Handler (Play Overlay)
+ * -------------------------------------------------- */
+
+  async function imdbHandler() {
+    const imdbId = location.pathname.match(/title\/(tt\d+)/)?.[1];
+    if (!imdbId) return showNotification("Couldn't detect IMDb ID on this page.");
+
+    // Try to insert play button reliably
+    function tryInsertButton(attempt = 0) {
+      const target = document.querySelector('[data-testid="tm-box-wl-button"]')?.parentElement
+        || document.querySelector('.ipc-btn__text')?.closest('.ipc-button')?.parentElement
+        || document.querySelector('[data-testid="hero-title-block__buttons"]')
+        || document.querySelector('header'); // fallback spot
+
+      if (!target && attempt < 15) {
+        setTimeout(() => tryInsertButton(attempt + 1), 500);
+        return;
+      }
+
+      if (!target) {
+        console.warn('IMDb: failed to find injection target for play button.');
+        showNotification('Failed to insert Play button on IMDb page. You can use Shift+P to trigger the overlay manually.', 8000);
+        return;
+      }
+
+      // Prevent duplicate button
+      if (document.getElementById('tmdb-bttn-overlay')) return;
+
+      const bttn = document.createElement('button');
+      bttn.id = 'tmdb-bttn-overlay';
+      bttn.textContent = '▶ Play';
+      bttn.style.cssText = `
+      margin-top:10px;
+      cursor:pointer;
+      padding:8px 12px;
+      background:#f5c518;
+      color:#000;
+      border:none;
+      border-radius:24px;
+      font-weight:bold;
+      font-size:18px;
+      transition:all 0.2s ease;
+      width:100%;
+      max-width:100%;
+      height:3rem;
+      text-align:left;
+    `;
+      bttn.onmouseenter = () => bttn.style.background = '#e2b616';
+      bttn.onmouseleave = () => bttn.style.background = '#f5c518';
+
+      // Insert the Play button between the "Add to Watchlist" block and the "Mark as watched" button
+      try {
+        // look for a nearby "watched" button (robust selectors)
+        const watchedBtn = (target.parentElement && target.parentElement.querySelector('button[data-testid^="watched-button"], button[aria-label*="watched"]'))
+          || document.querySelector('button[data-testid^="watched-button"], button[aria-label*="watched"]');
+        if (watchedBtn && watchedBtn.parentElement === target.parentElement) {
+          // place before the watched button so layout becomes: (watchlist) (play) (watched)
+          target.parentElement.insertBefore(bttn, watchedBtn);
+        } else if (target.nextSibling) {
+          // fallback: insert immediately after the watchlist block
+          target.parentElement.insertBefore(bttn, target.nextSibling);
+        } else {
+          // final fallback: append to target's parent
+          target.parentElement.appendChild(bttn);
+        }
+      } catch (insErr) {
+        // if anything goes wrong, append as before
+        target.appendChild(bttn);
+      }
+
+      bttn.addEventListener('click', () => triggerOverlay(imdbId));
+    }
+
+    tryInsertButton();
+
+    // Fallback keybind (Shift+P)
+    document.addEventListener('keydown', e => {
+      if (e.shiftKey && e.key.toLowerCase() === 'p') {
+        showNotification('Manual IMDb overlay trigger used.', 3000);
+        triggerOverlay(imdbId);
+      }
+    });
+
+    // Core overlay logic
+    async function triggerOverlay(imdbId) {
+      const bttn = document.getElementById('tmdb-bttn-overlay');
+      if (bttn) { bttn.disabled = true; bttn.textContent = 'Loading...'; }
+
+      try {
+        const apiKey = getNextApiKey();
+        const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
+        const json = await res.json();
+        const data = json.movie_results?.[0] || json.tv_results?.[0];
+
+        if (!data) {
+          showNotification('TMDb match not found for this IMDb ID.');
+          if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
+          return;
+        }
+
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'tmdb-overlay';
+        overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', e => {
+          if (e.target === overlay) overlay.remove();
+        });
+
+        // Render TMDb info box using existing processSearchResult()
+        await processSearchResult(data);
+
+        const infoCard = document.querySelector('.tmdb-info-card');
+        if (infoCard) {
+          overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
+        } else {
+          overlay.remove();
+          showNotification('Failed to display info box.');
+        }
+      } catch (err) {
+        console.error('IMDb overlay error:', err);
+        showNotification('Failed to fetch TMDb info.');
+      } finally {
+        if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
+      }
+    }
   }
+
+  GM_addStyle(`
+    .tmdb-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 9999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .tmdb-overlay-inner {
+      background: rgb(3,37,65);
+      color: #e9f1f7;
+      border-radius: 12px;
+      padding: 20px;
+      width: min(90vw, 950px);
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    }
+  `);
+
 
   /* ----------------------------------------------------
   * Action time
