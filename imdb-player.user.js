@@ -1,10 +1,14 @@
 // ==UserScript==
-// @name         IMDB Links - Minimal Shell
+// @name         IMDB Playable Links
 // @namespace    http://tampermonkey.net/
-// @version      0.1.0
+// @version      0.2
 // @description  Minimal shell: notification queue + FAB to open links modal. Meant as a clean starting point.
 // @match        https://www.imdb.com/title/*
 // @match        https://imdb.com/title/*
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_deleteValue
+// @grant        GM_setClipboard
 // @grant        GM_addStyle
 // ==/UserScript==
 
@@ -41,6 +45,24 @@
     requestAnimationFrame(() => el.classList.add('show'));
     setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.remove(); processQueue(); }, 200); }, duration);
   }
+
+  /* ----------------------------------------------------
+  * API Keys setup (unchanged behavior)
+  * -------------------------------------------------- */
+  let apiKeys = GM_getValue('tmdb_api_keys', null);
+  if (!apiKeys) {
+    const keysInput = prompt("To get your API key visit https://www.themoviedb.org/settings/api. Enter your TMDb API keys, separated by commas:");
+    if (keysInput) {
+      apiKeys = keysInput.split(',').map(k => k.trim());
+      GM_setValue('tmdb_api_keys', JSON.stringify(apiKeys));
+      showNotification("API keys setup successfully. You can manage them via Shift+R → Settings.", 6000);
+    } else {
+      showNotification("No API keys entered. Script cannot continue.");
+      return;
+    }
+  } else { apiKeys = JSON.parse(apiKeys); }
+
+  let currentKeyIndex = 0;
 
   // Extract the page title from the H1 -> .hero__primary-text and verify textlength attr
   function getTitleFromPage() {
@@ -81,8 +103,8 @@
           <button id="imdb-links-close" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button>
         </div>
         <div id="imdb-links-container">
-          <div>Watch Links</div>
-          <div>Download Links</div>
+          <div><em>Add your links here (use the IMDb id or the extracted title).</em></div>
+          <div>API key: <strong>${apiKeys}</strong></div>
         </div>
       </div>`;
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeLinksModal(); });
@@ -90,6 +112,15 @@
     document.getElementById('imdb-links-close').onclick = closeLinksModal;
   }
   function closeLinksModal() { const ov = document.querySelector('#imdb-links-modal'); if (ov) ov.remove(); }
+
+  /* ----------------------------------------------------
+  * TMDb + YTS fetch
+  * -------------------------------------------------- */
+  function getNextApiKey() {
+    const key = apiKeys[currentKeyIndex];
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    return key;
+  }
 
   // create FAB to open the modal
   try {

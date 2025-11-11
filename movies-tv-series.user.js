@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Enhance Movie/Series Search
 // @namespace    http://tampermonkey.net/
-// @version      1.2.2
+// @version      1.3
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
 // @match        https://www.bing.com/search*
+// @match        https://www.themoviedb.org/*
+// @match        https://www.imdb.com/title/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -31,7 +33,8 @@
     enableEpisodeSelection: true,    // allow changing episode number when playing TV
     enableTrailerButton: true,       // show Watch trailer button
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
-    showCertifications: true         // fetch + display MPAA/TV rating
+    showCertifications: true,        // fetch + display MPAA/TV rating
+    enableOnImdbPage: true,          // enable features on IMDb title pages
   };
 
   function loadSettings() {
@@ -111,6 +114,11 @@
   const isGoogle = hostname.includes('google.');
   const isBing = hostname.includes('bing.com');
   const isDuckDuckGo = hostname.includes('duckduckgo.com');
+  const isImdb = hostname.includes('imdb.com');
+
+  function isSearch() {
+    if (isGoogle || isBing || isDuckDuckGo) return true;
+  }
 
   function getSearchQuery() {
     const params = new URLSearchParams(window.location.search);
@@ -128,11 +136,14 @@
   }
 
   const parent = getInsertionPoint();
-  if (!parent) return;
+  let cleanedQuery = null;
 
-  const queryRaw = getSearchQuery();
-  if (!queryRaw) return;
-  const cleanedQuery = queryRaw.replace(/(watch|online|cast|movie|movies|tv|stream|showtimes|series|episodes|trakt|tmdb|imdb)/gi, '').replace(/\s+/g, ' ').trim();
+  if (isSearch()) {
+    if (!parent) return;
+    const queryRaw = getSearchQuery();
+    if (!queryRaw) return;
+    cleanedQuery = queryRaw.replace(/(watch|online|cast|movie|movies|tv|stream|showtimes|series|episodes|trakt|tmdb|imdb)/gi, '').replace(/\s+/g, ' ').trim();
+  }
 
   /* ----------------------------------------------------
    * Notifications (respect setting)
@@ -170,7 +181,7 @@
     overlay.innerHTML = `
       <div class="tmdb-settings" role="dialog" aria-modal="true">
         <header>
-          <h2>TMDb Script Settings</h2>
+          <h2>Movies/TV Shows Script Settings</h2>
           <button class="tmdb-btn ghost" id="tmdb-close">✕</button>
         </header>
         <div class="body">
@@ -186,6 +197,7 @@
           ${checkbox('enableTrailerButton', 'Show "Watch trailer" button', SETTINGS.enableTrailerButton)}
           ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
+          ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
 
           <div class="full">
             <label class="full" style="flex-direction:column;align-items:flex-start">
@@ -820,18 +832,27 @@
     if (btn) btn.style.display = 'none';
   }
 
-  /* ----------------------------------------------------
-   * Action time
-   * -------------------------------------------------- */
-  if (SETTINGS.autoDetectOnSERP && isMedia) {
-    fetchWithFallback(cleanedQuery);
-  } else {
-    const btn = document.createElement('button');
-    btn.textContent = 'Search TMDb Info';
-    btn.id = 'tmdb-button';
-    btn.onclick = () => fetchWithFallback(cleanedQuery);
-    parent.prepend(btn);
+  function imdbHandler() {
+    showNotification('IMDB page detected!', 10000);
   }
+
+  /* ----------------------------------------------------
+  * Action time
+  * -------------------------------------------------- */
+  if (isSearch()) {
+    if (SETTINGS.autoDetectOnSERP && isMedia) {
+      fetchWithFallback(cleanedQuery);
+    } else {
+      const btn = document.createElement('button');
+      btn.textContent = 'Search TMDb Info';
+      btn.id = 'tmdb-button';
+      btn.onclick = () => fetchWithFallback(cleanedQuery);
+      parent.prepend(btn);
+    }
+  } else if (isImdb && SETTINGS.enableOnImdbPage) {
+    imdbHandler();
+  }
+
 
   // Floating settings FAB (opens settings panel)
   try {
