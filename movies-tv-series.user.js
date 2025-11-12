@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.4.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -650,8 +650,18 @@
       if (existing) existing.remove();
 
       const apiKey = getNextApiKey();
-      const imdbResp = await fetch(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
-      const imdb_id = (await imdbResp.json()).imdb_id;
+      let imdbId = null;
+      // if on IMDb page, extract directly from URL
+      if (isImdb) {
+        imdbId = location.pathname.match(/title\/(tt\d+)/)?.[1];
+      }
+      let imdb_id = null;
+      if (imdbId) { imdb_id = imdbId; }
+      else {
+        // fetch from TMDb external_ids endpoint
+        const imdbResp = await fetch(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
+        imdb_id = (await imdbResp.json()).imdb_id;
+      }
 
       if (result.media_type === 'movie') {
         if (SETTINGS.enableYtsTorrents) {
@@ -812,13 +822,34 @@
     const apiKey = getNextApiKey();
     let cert = '';
     try {
-      if (type === 'movie') {
+      if (isImdb){
+        try {
+          const certLink = document.querySelector('a[href*="/parentalguide"][href*="#certificates"]');
+          if (certLink) {
+            const certText = certLink.textContent.trim();
+            if (certText && certText.length <= 8) {
+              console.log(`IMDb rating found: ${certText}`);
+              cert = certText;
+            }
+          }else{
+            // fallback: IMDb sometimes hides it in storyline section or metadata list
+            const alt = Array.from(document.querySelectorAll('li, div, span'))
+            .find(el => /TV-|PG-|R\b|G\b|NC-17|Unrated/i.test(el.textContent));
+            if (alt) {
+              const match = alt.textContent.match(/TV-[A-Z0-9+-]+|PG-[0-9]+|R|G|NC-17|Unrated/i);
+              if (match) cert = match[0];
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to extract IMDb certification', err);
+        }
+      } else if (type === 'movie' || cert === '') {
         const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/release_dates?api_key=${apiKey}`);
         const json = await res.json();
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
         cert = us?.release_dates?.[0]?.certification || '';
         if (!cert) { const tr = json.results?.find(r => r.iso_3166_1 === 'TR'); cert = tr?.rating || ''; }
-      } else if (type === 'tv') {
+      } else if (type === 'tv' || cert === '') {
         const res = await fetch(`https://api.themoviedb.org/3/tv/${id}/content_ratings?api_key=${apiKey}`);
         const json = await res.json();
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
@@ -840,6 +871,9 @@
   /* ----------------------------------------------------
  * IMDb Page Handler (Play Overlay)
  * -------------------------------------------------- */
+
+  // Simple cache for IMDb→TMDb lookups
+  const imdbCache = new Map();
 
   async function imdbHandler() {
     const imdbId = location.pathname.match(/title\/(tt\d+)/)?.[1];
@@ -927,6 +961,13 @@
       if (bttn) { bttn.disabled = true; bttn.textContent = 'Loading...'; }
 
       try {
+        // check cache first
+        if (imdbCache.has(imdbId)) {
+          console.log(`Using cached TMDb data for ${imdbId}`);
+          const cached = imdbCache.get(imdbId);
+          return renderOverlayFromCache(cached);
+        }
+
         const apiKey = getNextApiKey();
         const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
         const json = await res.json();
@@ -938,31 +979,41 @@
           return;
         }
 
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'tmdb-overlay';
-        overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
-        document.body.appendChild(overlay);
+        // cache it for next time
+        imdbCache.set(imdbId, data);
 
-        overlay.addEventListener('click', e => {
-          if (e.target === overlay) overlay.remove();
-        });
-
-        // Render TMDb info box using existing processSearchResult()
-        await processSearchResult(data);
-
-        const infoCard = document.querySelector('.tmdb-info-card');
-        if (infoCard) {
-          overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
-        } else {
-          overlay.remove();
-          showNotification('Failed to display info box.');
-        }
+        renderOverlayFromCache(data);
       } catch (err) {
         console.error('IMDb overlay error:', err);
         showNotification('Failed to fetch TMDb info.');
       } finally {
         if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
+      }
+    }
+
+    // helper to render overlay either from cache or fresh data
+    async function renderOverlayFromCache(data) {
+      // remove any old overlay
+      document.querySelector('.tmdb-overlay')?.remove();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'tmdb-overlay';
+      overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.remove();
+      });
+
+      // use your existing logic to render info card
+      await processSearchResult(data);
+
+      const infoCard = document.querySelector('.tmdb-info-card');
+      if (infoCard) {
+        overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
+      } else {
+        overlay.remove();
+        showNotification('Failed to display info box.');
       }
     }
   }
