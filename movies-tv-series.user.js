@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      1.4.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
 // @match        https://www.bing.com/search*
 // @match        https://www.imdb.com/title/*
 // @match        https://imdb.com/title/*
+// @match        https://trakt.tv/movies/*
+// @match        https://trakt.tv/shows/*
+// @match        https://app.trakt.tv/movies/*
+// @match        https://app.trakt.tv/shows/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -23,6 +27,10 @@
    * -------------------------------------------------- */
   const DEFAULT_SETTINGS = {
     autoDetectOnSERP: true,          // auto-run on media-like SERP
+    enableOnGooglePage: true,        // enable features on Google search pages
+    enableOnBingPage: true,          // enable features on Bing search pages
+    enableOnImdbPage: true,          // enable features on IMDb title pages
+    enableOnTraktPage: true,         // enable features on Trakt title pages
     enableNotifications: true,       // toast notifications
     enableStreamingLinks: true,      // the big list of watch links
     enableFrontendLinks: true,       // cineby/flixer/velora/etc
@@ -35,7 +43,6 @@
     enableTrailerAutoPlay: false,    // auto-play trailer when opened
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true,        // fetch + display MPAA/TV rating
-    enableOnImdbPage: true,          // enable features on IMDb title pages
   };
 
   function loadSettings() {
@@ -116,6 +123,8 @@
   const isBing = hostname.includes('bing.com');
   const isDuckDuckGo = hostname.includes('duckduckgo.com');
   const isImdb = hostname.includes('imdb.com');
+  const isTrakt = hostname.includes('trakt.tv');
+  const isNewTrakt = hostname.includes('app.trakt.tv');
 
   function isSearch() {
     if (isGoogle || isBing || isDuckDuckGo) return true;
@@ -187,6 +196,10 @@
         </header>
         <div class="body">
           ${checkbox('autoDetectOnSERP', 'Auto-detect Movies/TV Shows', SETTINGS.autoDetectOnSERP)}
+          ${checkbox('enableOnGooglePage', 'Enable on Google site', SETTINGS.enableOnGooglePage)}
+          ${checkbox('enableOnBingPage', 'Enable on Bing site', SETTINGS.enableOnBingPage)}
+          ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
+          ${checkbox('enableOnTraktPage', 'Enable on Trakt site', SETTINGS.enableOnTraktPage)}
           ${checkbox('enableNotifications', 'Enable notifications', SETTINGS.enableNotifications)}
           ${checkbox('enableStreamingLinks', 'Show streaming links', SETTINGS.enableStreamingLinks)}
           ${checkbox('enableFrontendLinks', 'Show frontend links', SETTINGS.enableFrontendLinks)}
@@ -199,7 +212,6 @@
           ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
-          ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
 
           <div class="full">
             <label class="full" style="flex-direction:column;align-items:flex-start">
@@ -251,10 +263,10 @@
    * Smart media detection (original logic retained)
    * -------------------------------------------------- */
   let isMedia = false;
-  if (isGoogle) {
+  if (isGoogle && SETTINGS.enableOnGooglePage) {
     const rhsBlock = document.querySelector('#rhs');
     if (rhsBlock && /IMDb|TV series|Movie|Episodes|Run time/i.test(rhsBlock.innerText)) isMedia = true;
-  } else if (isBing) {
+  } else if (isBing && SETTINGS.enableOnBingPage) {
     const bingBlock = document.querySelector('.b_entityTP') || document.querySelector('.b_vList');
     if (bingBlock) {
       const links = bingBlock.querySelectorAll('a[href*="imdb.com"], a');
@@ -333,12 +345,12 @@
         ${SETTINGS.enableStreamingLinks ? `
         <div style="margin-top:6px;">
           <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (fastest) ↗</a><br/>
+          <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
           <a href="https://spencerdevs.xyz/${vidType}/${tmdbID}?theme=ff0000${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on spencerdevs.xyz ↗</a><br/>
           <a href="https://111movies.com/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.com ↗</a><br/>
           <a href="https://vidora.su/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Vidora.su ↗</a><br/>
-          <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidFast.pro ↗</a><br/>
           <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Smashy.stream ↗</a><br/>
         </div>` : ''}
@@ -869,8 +881,8 @@
   }
 
   /* ----------------------------------------------------
- * IMDb Page Handler (Play Overlay)
- * -------------------------------------------------- */
+  * IMDb Page Handler (Play Overlay)
+  * -------------------------------------------------- */
 
   // Simple cache for IMDb→TMDb lookups
   const imdbCache = new Map();
@@ -1041,6 +1053,14 @@
     }
   `);
 
+  /* ----------------------------------------------------
+  * Trakt Page Handler
+  * -------------------------------------------------- */
+
+  function traktHandler() {
+    showNotification('Trakt page handler not yet implemented.');
+  }
+
 
   /* ----------------------------------------------------
   * Action time
@@ -1057,6 +1077,8 @@
     }
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
     imdbHandler();
+  } else if (isTrakt && SETTINGS.enableOnTraktPage) {
+    traktHandler();
   }
 
 
