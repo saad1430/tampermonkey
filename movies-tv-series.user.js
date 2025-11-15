@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.2
+// @version      1.4.3
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -705,7 +705,6 @@
       const apiKey = getNextApiKey();
       const tmdbURL = `https://api.themoviedb.org/3/`;
       const url = `${tmdbURL}search/multi?api_key=${apiKey}&query=${encodeURIComponent(title)}`;
-      const ytsAPI = `https://yts.mx/api/v2/list_movies.json?query_term=`;
       try {
         const response = await fetch(url);
         const data = await response.json();
@@ -834,7 +833,7 @@
     const apiKey = getNextApiKey();
     let cert = '';
     try {
-      if (isImdb){
+      if (isImdb) {
         try {
           const certLink = document.querySelector('a[href*="/parentalguide"][href*="#certificates"]');
           if (certLink) {
@@ -843,10 +842,10 @@
               console.log(`IMDb rating found: ${certText}`);
               cert = certText;
             }
-          }else{
+          } else {
             // fallback: IMDb sometimes hides it in storyline section or metadata list
             const alt = Array.from(document.querySelectorAll('li, div, span'))
-            .find(el => /TV-|PG-|R\b|G\b|NC-17|Unrated/i.test(el.textContent));
+              .find(el => /TV-|PG-|R\b|G\b|NC-17|Unrated/i.test(el.textContent));
             if (alt) {
               const match = alt.textContent.match(/TV-[A-Z0-9+-]+|PG-[0-9]+|R|G|NC-17|Unrated/i);
               if (match) cert = match[0];
@@ -855,13 +854,13 @@
         } catch (err) {
           console.warn('Failed to extract IMDb certification', err);
         }
-      } else if (type === 'movie' || cert === '') {
+      } else if (type === 'movie' && cert === '') {
         const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/release_dates?api_key=${apiKey}`);
         const json = await res.json();
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
         cert = us?.release_dates?.[0]?.certification || '';
         if (!cert) { const tr = json.results?.find(r => r.iso_3166_1 === 'TR'); cert = tr?.rating || ''; }
-      } else if (type === 'tv' || cert === '') {
+      } else if (type === 'tv' && cert === '') {
         const res = await fetch(`https://api.themoviedb.org/3/tv/${id}/content_ratings?api_key=${apiKey}`);
         const json = await res.json();
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
@@ -962,7 +961,6 @@
     // Fallback keybind (Shift+P)
     document.addEventListener('keydown', e => {
       if (e.shiftKey && e.key.toLowerCase() === 'p') {
-        showNotification('Manual IMDb overlay trigger used.', 3000);
         triggerOverlay(imdbId);
       }
     });
@@ -1057,8 +1055,114 @@
   * Trakt Page Handler
   * -------------------------------------------------- */
 
+  // simple cache for Trakt→TMDb lookups
+  const traktCache = new Map();
+
   function traktHandler() {
-    showNotification('Trakt page handler not yet implemented.');
+    let watchBtn = null;
+    if (isTrakt && !isNewTrakt) {
+      watchBtn = document.querySelector('a.btn-watch-now');
+      if (!watchBtn) {
+        console.warn('Trakt: Watch Now button not found.');
+      }
+    } else if (isNewTrakt) {
+      watchBtn = document.querySelector('.trakt-summary-poster');
+      console.log(watchBtn);
+      if (!watchBtn) return;
+
+      const link = watchBtn.querySelector('a.trakt-link');
+      console.log(link);
+      if (!link || link.dataset.tmdbHijacked) return;
+
+      link.dataset.tmdbHijacked = 'true';
+      console.log('%c[TMDB Enhancer]%c Hijacked Trakt new UI poster link!', 'color:#1bb8d9;font-weight:bold', 'color:inherit');
+    }
+
+
+    const imdb = document.querySelector('a[href*="imdb.com/title/"]')?.href.match(/tt\d+/)?.[0] || null;
+    console.log(imdb);
+    const tmdbMatch = document.querySelector('a[href*="themoviedb.org/"]')?.href.match(/\/(movie|tv)\/(\d+)/);
+    const type = tmdbMatch ? tmdbMatch[1] : null;
+    const tmdb = tmdbMatch ? tmdbMatch[2] : null;
+
+    if (!tmdb) {
+      console.warn('Trakt: TMDb id missing.');
+      return;
+    }
+
+    // Fallback keybind (Shift+P)
+    document.addEventListener('keydown', e => {
+      if (e.shiftKey && e.key.toLowerCase() === 'p') {
+        triggerTraktOverlay({ imdb, tmdb, type });
+      }
+    });
+
+    // Hijack Trakt modal trigger
+    watchBtn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      triggerTraktOverlay({ imdb, tmdb, type });
+    }, true);
+  }
+
+  async function triggerTraktOverlay({ imdb, tmdb, type }) {
+    if (document.querySelector('.tmdb-overlay')) return;
+
+    // cache key by TMDb id
+    const cacheKey = `${type}:${tmdb}`;
+    if (traktCache.has(cacheKey)) {
+      console.log('Using cached TMDb data for', cacheKey);
+      return renderTraktOverlay(traktCache.get(cacheKey));
+    }
+
+    const apiKey = getNextApiKey();
+    const tmdbBase = 'https://api.themoviedb.org/3';
+    try {
+      // main details
+      const res = await fetch(`${tmdbBase}/${type}/${tmdb}?api_key=${apiKey}`);
+      const data = await res.json();
+
+      // external ids (for imdb)
+      let imdb_id = imdb;
+      if (!imdb_id) {
+        const extRes = await fetch(`${tmdbBase}/${type}/${tmdb}/external_ids?api_key=${apiKey}`);
+        imdb_id = (await extRes.json()).imdb_id || null;
+      }
+      data.media_type = type;
+      data.external_imdb = imdb_id;
+
+      // cache it
+      traktCache.set(cacheKey, data);
+      renderTraktOverlay(data);
+    } catch (err) {
+      console.error('Trakt overlay error:', err);
+      showNotification('Failed to fetch TMDb info.');
+    }
+  }
+
+  async function renderTraktOverlay(data) {
+    document.querySelector('.tmdb-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tmdb-overlay';
+    overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    // Build a result-like object for processSearchResult
+    const fakeResult = {
+      id: data.id,
+      media_type: data.media_type,
+      title: data.title || data.name,
+      release_date: data.release_date,
+      first_air_date: data.first_air_date
+    };
+
+    // We already have IMDb id — pass it directly
+    await processSearchResult(fakeResult);
+    const card = document.querySelector('.tmdb-info-card');
+    if (card) overlay.querySelector('#tmdb-overlay-inner').appendChild(card);
+    else overlay.remove();
   }
 
 
