@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.3
+// @version      1.4.4
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -279,7 +279,7 @@
   /* ----------------------------------------------------
    * UI: Info Box Renderer (kept, now conditional by settings)
    * -------------------------------------------------- */
-  function renderInfoBox(data, torrents = null, imdb = null) {
+  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
     const date = data.release_date || data.first_air_date || 'Unknown Date';
@@ -294,8 +294,9 @@
     let html = '';
     let eztv = '';
     let imdb_link = '';
-    let season_number = 1;
-    let episode_number = 1;
+    // use specified season/episode if provided (e.g. Trakt preview links), otherwise default to 1
+    let season_number = specifiedSeason ? Number(specifiedSeason) : 1;
+    let episode_number = specifiedEpisode ? Number(specifiedEpisode) : 1;
     let torrentLinks = [];
 
     if (imdb) imdb_link = `https://www.imdb.com/title/${imdb}`;
@@ -346,7 +347,7 @@
         <div style="margin-top:6px;">
           <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (fastest) ↗</a><br/>
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
-          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
+          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
           <a href="https://spencerdevs.xyz/${vidType}/${tmdbID}?theme=ff0000${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on spencerdevs.xyz ↗</a><br/>
           <a href="https://111movies.com/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.com ↗</a><br/>
@@ -653,7 +654,7 @@
   }
 
   // Process a single TMDb search result: fetch IMDb id, optional YTS torrents, then render
-  async function processSearchResult(result) {
+  async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
     const ytsAPI = `https://yts.mx/api/v2/list_movies.json?query_term=`;
     try {
@@ -681,16 +682,16 @@
             const magnet = await fetch(`${ytsAPI}${imdb_id}`);
             const magnetData = await magnet.json();
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
-              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id);
+              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode);
             } else {
-              renderInfoBox(result, null, imdb_id);
+              renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
             }
-          } catch { renderInfoBox(result, null, imdb_id); }
+          } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode); }
         } else {
-          renderInfoBox(result, null, imdb_id);
+          renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
         }
       } else {
-        renderInfoBox(result, null, imdb_id);
+        renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
       }
 
       if (SETTINGS.showCertifications) addCertificationAsync(result.id, result.media_type);
@@ -1059,31 +1060,21 @@
   const traktCache = new Map();
 
   function traktHandler() {
-    let watchBtn = null;
-    if (isTrakt && !isNewTrakt) {
-      watchBtn = document.querySelector('a.btn-watch-now');
-      if (!watchBtn) {
-        console.warn('Trakt: Watch Now button not found.');
-      }
-    } else if (isNewTrakt) {
-      watchBtn = document.querySelector('.trakt-summary-poster');
-      console.log(watchBtn);
-      if (!watchBtn) return;
-
-      const link = watchBtn.querySelector('a.trakt-link');
-      console.log(link);
-      if (!link || link.dataset.tmdbHijacked) return;
-
-      link.dataset.tmdbHijacked = 'true';
-      console.log('%c[TMDB Enhancer]%c Hijacked Trakt new UI poster link!', 'color:#1bb8d9;font-weight:bold', 'color:inherit');
+    let watchBtn = document.querySelector('a.btn-watch-now');
+    if (!watchBtn) {
+      console.warn('Trakt: Watch Now button not found.');
     }
 
-
+    // capture optional season/episode if present in the TMDb URL
+    const tmdbHref = document.querySelector('a[href*="themoviedb.org/"]')?.href || '';
+    // support both /tv/123/5/11 and /tv/123/season/5/episode/11 forms
+    const tmdbMatch = tmdbHref.match(/\/(movie|tv)\/(\d+)(?:\/(?:(\d+)\/(\d+))|\/season\/(\d+)\/episode\/(\d+))?/);
     const imdb = document.querySelector('a[href*="imdb.com/title/"]')?.href.match(/tt\d+/)?.[0] || null;
-    console.log(imdb);
-    const tmdbMatch = document.querySelector('a[href*="themoviedb.org/"]')?.href.match(/\/(movie|tv)\/(\d+)/);
     const type = tmdbMatch ? tmdbMatch[1] : null;
     const tmdb = tmdbMatch ? tmdbMatch[2] : null;
+    // pick the correct capturing groups (3/4 for simple form, 5/6 for 'season/episode' form)
+    const tmdbSeason = tmdbMatch ? (tmdbMatch[3] ? parseInt(tmdbMatch[3], 10) : (tmdbMatch[5] ? parseInt(tmdbMatch[5], 10) : null)) : null;
+    const tmdbEpisode = tmdbMatch ? (tmdbMatch[4] ? parseInt(tmdbMatch[4], 10) : (tmdbMatch[6] ? parseInt(tmdbMatch[6], 10) : null)) : null;
 
     if (!tmdb) {
       console.warn('Trakt: TMDb id missing.');
@@ -1093,7 +1084,7 @@
     // Fallback keybind (Shift+P)
     document.addEventListener('keydown', e => {
       if (e.shiftKey && e.key.toLowerCase() === 'p') {
-        triggerTraktOverlay({ imdb, tmdb, type });
+        triggerTraktOverlay({ imdb, tmdb, type, season: tmdbSeason, episode: tmdbEpisode });
       }
     });
 
@@ -1101,18 +1092,18 @@
     watchBtn.addEventListener('click', e => {
       e.preventDefault();
       e.stopImmediatePropagation();
-      triggerTraktOverlay({ imdb, tmdb, type });
+      triggerTraktOverlay({ imdb, tmdb, type, season: tmdbSeason, episode: tmdbEpisode });
     }, true);
   }
 
-  async function triggerTraktOverlay({ imdb, tmdb, type }) {
+  async function triggerTraktOverlay({ imdb, tmdb, type, season = null, episode = null }) {
     if (document.querySelector('.tmdb-overlay')) return;
 
-    // cache key by TMDb id
-    const cacheKey = `${type}:${tmdb}`;
+    // cache key by TMDb id (include season/episode so different episode previews cache separately)
+    const cacheKey = `${type}:${tmdb}${season ? `:s${season}` : ''}${episode ? `:e${episode}` : ''}`;
     if (traktCache.has(cacheKey)) {
       console.log('Using cached TMDb data for', cacheKey);
-      return renderTraktOverlay(traktCache.get(cacheKey));
+      return renderTraktOverlay(traktCache.get(cacheKey), season, episode);
     }
 
     const apiKey = getNextApiKey();
@@ -1131,16 +1122,16 @@
       data.media_type = type;
       data.external_imdb = imdb_id;
 
-      // cache it
+      // cache it (store the TMDb data; season/episode passed separately)
       traktCache.set(cacheKey, data);
-      renderTraktOverlay(data);
+      renderTraktOverlay(data, season, episode);
     } catch (err) {
       console.error('Trakt overlay error:', err);
       showNotification('Failed to fetch TMDb info.');
     }
   }
 
-  async function renderTraktOverlay(data) {
+  async function renderTraktOverlay(data, season = null, episode = null) {
     document.querySelector('.tmdb-overlay')?.remove();
 
     const overlay = document.createElement('div');
@@ -1158,11 +1149,19 @@
       first_air_date: data.first_air_date
     };
 
-    // We already have IMDb id — pass it directly
-    await processSearchResult(fakeResult);
+    // We already have IMDb id — pass it directly and include season/episode so links are built for them
+    await processSearchResult(fakeResult, season, episode);
     const card = document.querySelector('.tmdb-info-card');
     if (card) overlay.querySelector('#tmdb-overlay-inner').appendChild(card);
     else overlay.remove();
+  }
+
+  /* ----------------------------------------------------
+  * Trakt New UI Handler
+  * -------------------------------------------------- */
+
+  function newTraktHandler() {
+    showNotification('TMDb Enhancer: Trakt new UI detected. Underdevelopment, please wait!', 8000);
   }
 
 
@@ -1182,7 +1181,8 @@
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
     imdbHandler();
   } else if (isTrakt && SETTINGS.enableOnTraktPage) {
-    traktHandler();
+    if (!isNewTrakt) traktHandler();
+    else newTraktHandler();
   }
 
 
