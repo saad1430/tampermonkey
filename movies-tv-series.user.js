@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.5
+// @version      1.4.6
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -50,12 +50,13 @@
   * Announcements (What's New)
   * -------------------------------------------------- */
 
-  const ANNOUNCEMENT_VERSION = "1.4.5";
+  const ANNOUNCEMENT_VERSION = "1.4.6";
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Added YTS language display in torrent links</li>
       <li>Improved torrent UI formatting</li>
+      <li>Playing trailer now try to close all the other overlays</li>
       <li>Added announcement system to display "What's New" once per update</li>
     </ul>
   `;
@@ -490,6 +491,7 @@
 
         trailerBtn.addEventListener('click', async () => {
           // prevent multiple overlays
+          document.querySelector('.tmdb-overlay')?.remove();
           if (document.querySelector('.tmdb-trailer-modal')) return;
           trailerBtn.disabled = true; trailerBtn.textContent = 'Loading...';
           try {
