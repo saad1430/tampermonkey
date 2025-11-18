@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.4
+// @version      1.4.5
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -45,6 +45,55 @@
     showCertifications: true,        // fetch + display MPAA/TV rating
   };
 
+
+  /* ----------------------------------------------------
+  * Announcements (What's New)
+  * -------------------------------------------------- */
+
+  const ANNOUNCEMENT_VERSION = "1.4.5";
+  const ANNOUNCEMENT_MESSAGE = `
+    <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
+    <ul style="margin-left:20px; line-height:1.5;">
+      <li>Added YTS language display in torrent links</li>
+      <li>Improved torrent UI formatting</li>
+      <li>Added announcement system to display "What's New" once per update</li>
+    </ul>
+  `;
+
+  function maybeShowAnnouncement() {
+    const seenVersion = GM_getValue("announcement_seen_version", null);
+    if (seenVersion === ANNOUNCEMENT_VERSION) return; // already seen
+
+    // Show modal
+    showAnnouncementModal(ANNOUNCEMENT_MESSAGE + `<p style="opacity:0.7;">(This message will only appear once. If you want to see it again, refer to settings panel and click show latest announcement)</p>`);
+
+    // Mark as seen
+    GM_setValue("announcement_seen_version", ANNOUNCEMENT_VERSION);
+  }
+
+  function showAnnouncementModal(messageHTML) {
+    // Remove if already present
+    document.querySelector('.tmdb-announcement-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tmdb-announcement-overlay';
+    overlay.innerHTML = `
+    <div class="tmdb-announcement-box">
+      <button class="tmdb-announcement-close">✕</button>
+      <div class="tmdb-announcement-content">${messageHTML}</div>
+    </div>
+  `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.tmdb-announcement-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  }
+
+  /* ----------------------------------------------------
+  * Load/Save Settings
+  * -------------------------------------------------- */
+
   function loadSettings() {
     try { return { ...DEFAULT_SETTINGS, ...(JSON.parse(GM_getValue('tmdb_settings', '{}')) || {}) }; }
     catch { return { ...DEFAULT_SETTINGS }; }
@@ -52,6 +101,11 @@
   function saveSettings(s) { GM_setValue('tmdb_settings', JSON.stringify(s)); }
 
   let SETTINGS = loadSettings();
+  maybeShowAnnouncement();
+
+  /* ----------------------------------------------------
+  * Styles
+  * -------------------------------------------------- */
 
   GM_addStyle(`
     .tmdb-settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999999;display:flex;align-items:center;justify-content:center}
@@ -95,6 +149,11 @@
   .tmdb-trailer-content{width:80vw;max-width:1900px;aspect-ratio:16/9;height:auto;max-height:95vh;background:#000;border-radius:8px;overflow:hidden;position:relative}
   .tmdb-trailer-content iframe{width:100%;height:100%;border:0;background:#000}
   .tmdb-trailer-close{position:absolute;right:8px;top:8px;z-index:10;background:rgba(255,255,255,.06);border:none;color:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
+  .tmdb-announcement-overlay {position: fixed;inset: 0;background: rgba(0,0,0,0.75);z-index: 9999999;display: flex;align-items: center;justify-content: center;}
+  .tmdb-announcement-box {background: rgb(3,37,65);color: #e9f1f7;border-radius: 12px;padding: 20px 24px;width: min(90vw, 450px);box-shadow: 0 0 30px rgba(0,0,0,0.5);position: relative;animation: fadeIn 0.25s ease-out;}
+  .tmdb-announcement-close {position: absolute;right: 10px;top: 8px;background: rgba(255,255,255,0.1);border: none;color: #fff;border-radius: 4px;padding: 4px 8px;cursor: pointer;}
+  .tmdb-announcement-content {margin-top: 10px;font-size: 15px;}
+  @keyframes fadeIn {from { opacity: 0; transform: scale(0.95); }to { opacity: 1; transform: scale(1); }}
   `);
 
   /* ----------------------------------------------------
@@ -221,6 +280,11 @@
           </div>
         </div>
         <footer>
+          <div class="full">
+            <button class="tmdb-btn ghost" id="tmdb-show-announcement">
+              Show latest announcement
+            </button>
+          </div>
           <button class="tmdb-btn primary" id="tmdb-save">Save & Apply</button>
         </footer>
       </div>`;
@@ -244,6 +308,11 @@
       SETTINGS = next; saveSettings(SETTINGS);
       showNotification('Settings saved. They apply immediately for new actions; reload to re-run auto-detect.', 7000);
       closeSettingsPanel();
+    };
+
+    document.getElementById("tmdb-show-announcement").onclick = () => {
+      closeSettingsPanel(); // close settings to avoid stacking modals
+      showAnnouncementModal(ANNOUNCEMENT_MESSAGE);
     };
   }
   function closeSettingsPanel() {
@@ -279,7 +348,7 @@
   /* ----------------------------------------------------
    * UI: Info Box Renderer (kept, now conditional by settings)
    * -------------------------------------------------- */
-  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null) {
+  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
     const date = data.release_date || data.first_air_date || 'Unknown Date';
@@ -309,7 +378,7 @@
         if (torrentLinks?.length) {
           html = `<div style="margin-top:6px;"><strong>Torrents:</strong><br/>`;
           torrentLinks.forEach(link => {
-            html += `<a href="${link.magnet}" rel="noopener" style="color:#1bb8d9;font-weight:bold;">${link.quality} (${link.size}) - ${link.type} ${link.video} (Audio Channel: ${link.audio}) - Seeders:${link.seeds} Peers:${link.peers}</a><br/>`;
+            html += `<a href="${link.magnet}" rel="noopener" style="color:#1bb8d9;font-weight:bold;">${link.quality} (${link.size}) - ${link.type} ${link.video} (Audio Channel: ${link.audio})${ytsLanguage ? ` - Lang: [${ytsLanguage.toUpperCase()}]` : ""} - Seeders:${link.seeds} Peers:${link.peers}</a><br/>`;
           });
           html += `</div>`;
         }
@@ -682,16 +751,16 @@
             const magnet = await fetch(`${ytsAPI}${imdb_id}`);
             const magnetData = await magnet.json();
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
-              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode);
+              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language);
             } else {
-              renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
+              renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null);
             }
-          } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode); }
+          } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
         } else {
-          renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
+          renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null);
         }
       } else {
-        renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode);
+        renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null);
       }
 
       if (SETTINGS.showCertifications) addCertificationAsync(result.id, result.media_type);
