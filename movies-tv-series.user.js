@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.6
+// @version      1.4.7
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -50,7 +50,7 @@
   * Announcements (What's New)
   * -------------------------------------------------- */
 
-  const ANNOUNCEMENT_VERSION = "1.4.6";
+  const ANNOUNCEMENT_VERSION = "1.4.7";
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
@@ -58,6 +58,7 @@
       <li>Improved torrent UI formatting</li>
       <li>Playing trailer now try to close all the other overlays</li>
       <li>Added announcement system to display "What's New" once per update</li>
+      <li>Changed YTS to a working domain</li>
     </ul>
   `;
 
@@ -727,7 +728,7 @@
   // Process a single TMDb search result: fetch IMDb id, optional YTS torrents, then render
   async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
-    const ytsAPI = `https://yts.mx/api/v2/list_movies.json?query_term=`;
+    const ytsAPI = `https://yts.lt/api/v2/list_movies.json?query_term=`;
     try {
       // remove any existing info card before rendering the new one
       const existing = parent.querySelector('.tmdb-info-card');
