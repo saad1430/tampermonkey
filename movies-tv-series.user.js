@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.4.7
+// @version      1.5.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @author       Saad1430
 // @match        https://www.google.com/search*
@@ -12,6 +12,11 @@
 // @match        https://trakt.tv/shows/*
 // @match        https://app.trakt.tv/movies/*
 // @match        https://app.trakt.tv/shows/*
+// @match        https://yts.lt/movies/*
+// @match        https://yts.mx/movies/*
+// @match        https://yts.ag/movies/*
+// @match        https://yts.am/movies/*
+// @match        https://yts.gg/movies/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -31,6 +36,7 @@
     enableOnBingPage: true,          // enable features on Bing search pages
     enableOnImdbPage: true,          // enable features on IMDb title pages
     enableOnTraktPage: true,         // enable features on Trakt title pages
+    enableOnYTSPage: true,           // enable features on YTS title pages
     enableNotifications: true,       // toast notifications
     enableStreamingLinks: true,      // the big list of watch links
     enableFrontendLinks: true,       // cineby/flixer/velora/etc
@@ -50,15 +56,11 @@
   * Announcements (What's New)
   * -------------------------------------------------- */
 
-  const ANNOUNCEMENT_VERSION = "1.4.7";
+  const ANNOUNCEMENT_VERSION = "1.5.0";
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added YTS language display in torrent links</li>
-      <li>Improved torrent UI formatting</li>
-      <li>Playing trailer now try to close all the other overlays</li>
-      <li>Added announcement system to display "What's New" once per update</li>
-      <li>Changed YTS to a working domain</li>
+      <li>Added YTS support</li>
     </ul>
   `;
 
@@ -186,6 +188,7 @@
   const isImdb = hostname.includes('imdb.com');
   const isTrakt = hostname.includes('trakt.tv');
   const isNewTrakt = hostname.includes('app.trakt.tv');
+  const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
 
   function isSearch() {
     if (isGoogle || isBing || isDuckDuckGo) return true;
@@ -261,6 +264,7 @@
           ${checkbox('enableOnBingPage', 'Enable on Bing site', SETTINGS.enableOnBingPage)}
           ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
           ${checkbox('enableOnTraktPage', 'Enable on Trakt site', SETTINGS.enableOnTraktPage)}
+          ${checkbox('enableOnYTSPage', 'Enable on YTS site', SETTINGS.enableOnYTSPage)}
           ${checkbox('enableNotifications', 'Enable notifications', SETTINGS.enableNotifications)}
           ${checkbox('enableStreamingLinks', 'Show streaming links', SETTINGS.enableStreamingLinks)}
           ${checkbox('enableFrontendLinks', 'Show frontend links', SETTINGS.enableFrontendLinks)}
@@ -1038,66 +1042,66 @@
       }
     });
 
-    // Core overlay logic
-    async function triggerOverlay(imdbId) {
-      const bttn = document.getElementById('tmdb-bttn-overlay');
-      if (bttn) { bttn.disabled = true; bttn.textContent = 'Loading...'; }
+  }
+  // Core overlay logic
+  async function triggerOverlay(imdbId) {
+    const bttn = document.getElementById('tmdb-bttn-overlay');
+    if (bttn) { bttn.disabled = true; bttn.textContent = 'Loading...'; }
 
-      try {
-        // check cache first
-        if (imdbCache.has(imdbId)) {
-          console.log(`Using cached TMDb data for ${imdbId}`);
-          const cached = imdbCache.get(imdbId);
-          return renderOverlayFromCache(cached);
-        }
+    try {
+      // check cache first
+      if (imdbCache.has(imdbId)) {
+        console.log(`Using cached TMDb data for ${imdbId}`);
+        const cached = imdbCache.get(imdbId);
+        return renderOverlayFromCache(cached);
+      }
 
-        const apiKey = getNextApiKey();
-        const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
-        const json = await res.json();
-        const data = json.movie_results?.[0] || json.tv_results?.[0];
+      const apiKey = getNextApiKey();
+      const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
+      const json = await res.json();
+      const data = json.movie_results?.[0] || json.tv_results?.[0];
 
-        if (!data) {
-          showNotification('TMDb match not found for this IMDb ID.');
-          if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
-          return;
-        }
-
-        // cache it for next time
-        imdbCache.set(imdbId, data);
-
-        renderOverlayFromCache(data);
-      } catch (err) {
-        console.error('IMDb overlay error:', err);
-        showNotification('Failed to fetch TMDb info.');
-      } finally {
+      if (!data) {
+        showNotification('TMDb match not found for this IMDb ID.');
         if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
+        return;
       }
+
+      // cache it for next time
+      imdbCache.set(imdbId, data);
+
+      renderOverlayFromCache(data);
+    } catch (err) {
+      console.error('IMDb overlay error:', err);
+      showNotification('Failed to fetch TMDb info.');
+    } finally {
+      if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
     }
+  }
 
-    // helper to render overlay either from cache or fresh data
-    async function renderOverlayFromCache(data) {
-      // remove any old overlay
-      document.querySelector('.tmdb-overlay')?.remove();
+  // helper to render overlay either from cache or fresh data
+  async function renderOverlayFromCache(data) {
+    // remove any old overlay
+    document.querySelector('.tmdb-overlay')?.remove();
 
-      const overlay = document.createElement('div');
-      overlay.className = 'tmdb-overlay';
-      overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
-      document.body.appendChild(overlay);
+    const overlay = document.createElement('div');
+    overlay.className = 'tmdb-overlay';
+    overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+    document.body.appendChild(overlay);
 
-      overlay.addEventListener('click', e => {
-        if (e.target === overlay) overlay.remove();
-      });
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.remove();
+    });
 
-      // use your existing logic to render info card
-      await processSearchResult(data);
+    // use your existing logic to render info card
+    await processSearchResult(data);
 
-      const infoCard = document.querySelector('.tmdb-info-card');
-      if (infoCard) {
-        overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
-      } else {
-        overlay.remove();
-        showNotification('Failed to display info box.');
-      }
+    const infoCard = document.querySelector('.tmdb-info-card');
+    if (infoCard) {
+      overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
+    } else {
+      overlay.remove();
+      showNotification('Failed to display info box.');
     }
   }
 
@@ -1236,6 +1240,80 @@
     showNotification('TMDb Enhancer: Trakt new UI detected. Underdevelopment, please wait!', 8000);
   }
 
+  /* ----------------------------------------------------
+  * YTS Handler
+  * -------------------------------------------------- */
+
+  async function ytsHandler() {
+    const imdbAnchor = document.querySelector('a[href*="imdb.com/title/tt"]');
+
+    if (!imdbAnchor) {
+      return console.warn("YTS: IMDb ID not found on page");
+    }
+
+    const imdbId = imdbAnchor.href.match(/tt\d+/)?.[0];
+    if (!imdbId) {
+      return console.warn("YTS: Failed to parse IMDb ID");
+    }
+
+    function insertPlayButton() {
+      // This is the download button you gave me
+      const original = document.querySelector(
+        'a.torrent-modal-download.button-green-download2-big.hidden-xs.hidden-sm'
+      );
+
+      if (!original) {
+        setTimeout(insertPlayButton, 500);
+        return;
+      }
+
+      // Avoid duplicates
+      if (document.getElementById('tmdb-yts-play')) return;
+
+      // Clone the download button
+      const playBtn = original.cloneNode(true);
+      playBtn.id = "tmdb-yts-play";
+
+      // Remove ALL YTS classes that cause popup modals
+      playBtn.className = "";  // resets classes entirely
+
+      // Apply your own
+      // Option A: Use YTS styling but without modal trigger
+      playBtn.classList.add(
+        "button-green-download2-big",
+        "hidden-xs",
+        "hidden-sm"
+      );
+
+      // Option B: Use only custom class (recommended — total isolation)
+      // playBtn.classList.add("tmdb-yts-play-btn");
+
+      // You can optionally replace the icon:
+      playBtn.innerHTML = `<span class="icon-play"></span> Play`;
+
+      // Remove YTS default click behavior completely
+      playBtn.href = "javascript:void(0);";
+      playBtn.removeAttribute("data-target");
+      playBtn.removeAttribute("data-toggle");
+
+      // Insert it right after the original button
+      original.parentNode.insertBefore(playBtn, original.nextSibling);
+
+      // Add our functionality
+      playBtn.addEventListener('click', () => {
+        triggerOverlay(imdbId);
+      });
+    }
+
+    insertPlayButton();
+
+    // Fallback shortcut
+    document.addEventListener("keydown", (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "p") {
+        triggerOverlay(imdbId);
+      }
+    });
+  }
 
   /* ----------------------------------------------------
   * Action time
@@ -1255,6 +1333,8 @@
   } else if (isTrakt && SETTINGS.enableOnTraktPage) {
     if (!isNewTrakt) traktHandler();
     else newTraktHandler();
+  } else if (isYTS) {
+    ytsHandler();
   }
 
 
