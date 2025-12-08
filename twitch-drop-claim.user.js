@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Twitch Auto Claim Drops
 // @namespace    https://www.twitch.tv/
-// @version      1.4
+// @version      1.4.1
 // @description  Auto claims Twitch drops reliably + refreshes page every 5 mins
+// @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/twitch-automation-100.png
 // @author       Saad1430
 // @match        https://www.twitch.tv/drops/inventory
 // @grant        none

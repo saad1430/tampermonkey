@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         SwiftUploads Instant Download Auto (Updated 30 Nov 2025)
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.1.1
 // @description  Auto-submit all SwiftUploads steps & auto-click final download (new 2025 system)
+// @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/swiftuploads-automation-100.png
 // @author       Saad1430
 // @match        https://swiftuploads.com/*
 // @match        https://www.swiftuploads.com/*

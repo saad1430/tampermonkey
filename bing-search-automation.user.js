@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Bing Random Search Automation
 // @namespace    http://tampermonkey.net/
-// @version      1.4.2
+// @version      1.4.3
 // @description  Automates Bing searches with human-like delays. Keybinds + notifications + clean Bing-styled status badge included.
+// @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/bing-automation-100.png
 // @author       Saad1430
 // @match        https://www.bing.com/*
 // @grant        none
