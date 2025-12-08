@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bing Random Search Automation
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      1.4.2
 // @description  Automates Bing searches with human-like delays. Keybinds + notifications + clean Bing-styled status badge included.
 // @author       Saad1430
 // @match        https://www.bing.com/*
@@ -13,822 +13,55 @@
 
   const words = [
     // --- Phrases (50) ---
-    "how to make homemade pizza", "best tourist places in europe", "upcoming movies 2025", "meditation techniques for stress",
-    "why is the sky blue", "new technology trends 2025", "easiest coding languages to learn", "photography tips for beginners",
-    "football world cup highlights", "healthy breakfast recipes", "top 10 netflix shows right now", "meaning of life quotes",
-    "how volcanoes are formed", "interesting history facts", "best laptops for students 2025", "current weather in new york",
-    "python vs javascript differences", "cheapest flights to london", "top universities in the world", "how to plant tomatoes",
-    "best smartphones under 500", "how to play guitar chords", "best free coding resources", "latest news headlines today",
-    "benefits of daily exercise", "popular anime series 2025", "best books to read this year", "how to improve memory power",
-    "quick dinner ideas easy", "how to learn french fast", "top travel destinations 2025", "best budget gaming laptops",
-    "most expensive paintings ever sold", "how to meditate properly", "famous historical events", "best sci fi movies 2025",
-    "tips for better sleep", "upcoming sports events", "how to bake chocolate cake", "simple workout routines at home",
-    "reasons why cats are popular", "fastest cars in the world", "best coffee shops near me", "how to reduce screen time",
-    "fun facts about space", "best productivity apps 2025", "how to tie a tie", "famous landmarks in paris",
-    "difference between ai and ml", "what is quantum computing",
+    "how to make homemade pizza", "best tourist places in europe", "upcoming movies 2025", "meditation techniques for stress", "why is the sky blue", "new technology trends 2025", "easiest coding languages to learn", "photography tips for beginners", "football world cup highlights", "healthy breakfast recipes", "top 10 netflix shows right now", "meaning of life quotes", "how volcanoes are formed", "interesting history facts", "best laptops for students 2025", "current weather in new york", "python vs javascript differences", "cheapest flights to london", "top universities in the world", "how to plant tomatoes", "best smartphones under 500", "how to play guitar chords", "best free coding resources", "latest news headlines today", "benefits of daily exercise", "popular anime series 2025", "best books to read this year", "how to improve memory power", "quick dinner ideas easy", "how to learn french fast", "top travel destinations 2025", "best budget gaming laptops", "most expensive ever sold", "how to meditate properly", "famous historical events", "best sci fi movies 2025", "tips for better sleep", "upcoming sports events", "how to bake chocolate cake", "simple workout routines at home", "reasons why cats are popular", "fastest cars in the world", "best coffee shops near me", "how to reduce screen time", "fun facts about space", "best productivity apps 2025", "how to tie a tie", "famous landmarks in paris", "difference between ai and ml", "what is quantum computing",
     // --- Phrases (50) ---
-    "best hiking trails in usa", "cheap recipes for students", "how to build a website", "benefits of drinking green tea",
-    "fastest trains in the world", "how to create a podcast", "top 10 android apps 2025", "who won the last champions league",
-    "famous quotes about friendship", "easy yoga poses for beginners", "how to invest in stocks", "most popular tourist attractions",
-    "how to lose weight naturally", "best movies released this year", "why do we dream at night", "new iphone release date",
-    "what is the metaverse explained", "fun science experiments at home", "how to save money quickly", "best programming languages 2025",
-    "places to visit in japan", "how to cook pasta perfectly", "top rated horror movies 2025", "how to stay motivated",
-    "best free photo editing software", "who invented the internet", "easy breakfast smoothie recipes", "what is blockchain technology",
-    "best action games for pc", "how to train your dog", "top rated restaurants near me", "how to write a good resume",
-    "latest cricket match highlights", "best online learning platforms", "simple hacks for productivity", "how to clean a laptop keyboard",
-    "famous inventions in history", "how to take better selfies", "best sci fi books ever", "top 10 richest people in the world",
-    "easy ways to learn spanish", "benefits of drinking coffee", "who painted the mona lisa", "fastest growing cities in 2025",
-    "best strategies for chess", "how to make money online", "upcoming concerts near me", "famous landmarks in italy",
-    "how to start a youtube channel", "difference between cloud and edge computing",
-
+    "best hiking trails in usa", "cheap recipes for students", "how to build a website", "benefits of drinking green tea", "fastest trains in the world", "how to create a podcast", "top 10 android apps 2025", "who won the last champions league", "famous quotes abou friendship", "easy yoga poses for beginners", "how to invest in stocks", "most popular tourist attractions", "how to lose weight naturally", "best movies released this year", "why do we dream at night", "new iphone release date", "what is the metaverse explained", "fun science experiments at home", "how to save money quickly", "best programming languages 2025", "places to visit in japan", "how to cook pasta perfectly", "top rated horror movies 2025", "how to stay motivated", "best free photo editing software", "who invented the internet", "easy breakfast smoothie recipes", "what is blockchain technology", "best action games for pc", "how to train your dog", "top rated restaurants near me", "how to write a good resume", "latest cricket match highlights", "best online learning platforms", "simple hacks for productivity", "how to clean a laptop keyboard", "famous inventions in history", "how to take better selfies", "best sci fi books ever", "top 10 richest people in the world", "easy ways to learn spanish", "benefits of drinking coffee", "who painted the mona lisa", "fastest growing cities in 2025", "best strategies for chess", "how to make money online", "upcoming concerts near me", "famous landmarks in italy", "how to start a youtube channel", "difference between cloud and edge computing",
     // TV / Movies (25)
-    "what happened in episode 5 of the latest season of a popular tv show",
-    "how many seasons does that tv series have",
-    "best plot twists in movies of the last decade",
-    "who directed the most popular films in 2024",
-    "what are the top rated tv dramas right now",
-    "how to understand ambiguous movie endings",
-    "which actors won awards this year for tv roles",
-    "how to find movie release dates by country",
-    "what are the must watch indie films this year",
-    "which streaming service has exclusive tv series x",
-    "how to binge watch a long tv series efficiently",
-    "what is the recommended viewing order for this franchise",
-    "how to find behind the scenes for my favorite movie",
-    "best documentary films about history",
-    "how are tv show ratings calculated",
-    "which movie adaptations are faithful to the book",
-    "how to follow a tv show's production updates",
-    "what are the best limited series of all time",
-    "how to find episode summaries for old tv shows",
-    "where to watch classic movies legally online",
-    "what are the highest grossing films by genre",
-    "how to identify cameos in movies",
-    "what questions to ask during a film festival Q&A",
-    "how to research actor filmographies quickly",
-    "what are the most rewatchable tv shows",
-
+    "what happened in episode 5 of the latest season of a popular tv show", "how many seasons does that tv series have", "best plot twists in movies of the last decade", "who directed the most popular films in 2024", "what are the top rated tv dramas right now", "how to understand ambiguous movie endings", "which actors won awards this year for tv roles", "how to find movie release dates by country", "what are the must watch indie films this year", "which streaming service has exclusive tv series x", "how to binge watch a long tv series efficiently", "what is the recommended viewing order for this franchise", "how to find behind the scenes for my favorite movie", "best documentary films about history", "how are tv show ratings calculated", "which movie adaptations are faithful to the book", "how to follow a tv show's production updates", "what are the best limited series of all time", "how to find episode summaries for old tv shows", "where to watch classic movies legally online", "what are the highest grossing films by genre", "how to identify cameos in movies", "what questions to ask during a film festival Q&A", "how to research actor filmographies quickly", "what are the most rewatchable tv shows",
     // Video Games (25)
-    "best role playing games to play in 2025",
-    "how to beat the final boss in a tough rpg",
-    "what are the top indie games this year",
-    "how to fix controller drift on xbox and playstation",
-    "best strategies for winning battle royale matches",
-    "how to get started with speedrunning a game",
-    "what hardware is needed for pc gaming on a budget",
-    "how to set up a streaming overlay for gameplay",
-    "best co op games to play with friends",
-    "how to improve aim in first person shooters",
-    "where to find game walkthroughs and guides",
-    "how to mod a single player game safely",
-    "what are the most anticipated game releases",
-    "how to optimize game settings for performance",
-    "best retro games to play for nostalgia",
-    "how to trade items safely in online games",
-    "what esports tournaments are happening this year",
-    "how to build a gaming pc step by step",
-    "best controllers for pc and console gaming",
-    "how to record high quality gameplay on a laptop",
-    "top puzzle games to train your brain",
-    "how to troubleshoot common connection issues in online games",
-    "what are good beginner friendly strategy games",
-    "how to manage game library storage on consoles",
-    "which games have the best open world exploration",
-
+    "best role playing games to play in 2025", "how to beat the final boss in a tough rpg", "what are the top indie games this year", "how to fix controller drift on xbox and playstation", "best strategies for winning battle royale matches", "how to get started with speedrunning a game", "what hardware is needed for pc gaming on a budget", "how to set up a streaming overlay for gameplay", "best co op games to play with friends", "how to improve aim in first person shooters", "where to find game walkthroughs and guides", "how to mod a single player game safely", "what are the most anticipated game releases", "how to optimize game settings for performance", "best retro games to play for nostalgia", "how to trade items safely in online games", "what esports tournaments are happening this year", "how to build a gaming pc step by step", "best controllers for pc and console gaming", "how to record high quality gameplay on a laptop", "top puzzle games to train your brain", "how to troubleshoot common connection issues in online games", "what are good beginner friendly strategy games", "how to manage game library storage on consoles", "which games have the best open world exploration",
     // Football & Cricket (25)
-    "how to improve shooting accuracy in football",
-    "best training drills for midfielders",
-    "what is the schedule for upcoming international football matches",
-    "how to choose the right football boots for wet pitches",
-    "who are the leading goal scorers in the current season",
-    "how to read football analytics and heatmaps",
-    "what are the rules for offside in simple terms",
-    "how to practice free kicks effectively",
-    "top tactics used by successful football managers",
-    "what equipment is essential for starting a local football club",
-    "how to play cricket as a beginner",
-    "what are common batting techniques in cricket",
-    "how to bowl yorkers consistently in limited overs",
-    "what is the cricket world cup qualification process",
-    "how to maintain a cricket pitch at home",
-    "best drills to improve fielding agility",
-    "how to understand dls calculations in rain-affected matches",
-    "who are rising stars in international cricket",
-    "what is the difference between t20 and test cricket strategies",
-    "how to choose cricket gear for juniors",
-    "top clubs to watch in european football right now",
-    "how to follow live football stats and commentary",
-    "what nutrition helps football players recover faster",
-    "how to handle pressure situations in penalty shootouts",
-    "what are the safest ways to train during off season",
-
+    "how to improve shooting accuracy in football", "best training drills for midfielders", "what is the schedule for upcoming international football matches", "how to choose the right football boots for wet pitches", "who are the leading goal scorers in the current season", "how to read football analytics and heatmaps", "what are the rules for offside in simple terms", "how to practice free kicks effectively", "top tactics used by successful football managers", "what equipment is essential for starting a local football club", "how to play cricket as a beginner", "what are common batting techniques in cricket", "how to bowl yorkers consistently in limited overs", "what is the cricket world cup qualification process", "how to maintain a cricket pitch at home", "best drills to improve fielding agility", "how to understand dls calculations in rain-affected matches", "who are rising stars in international cricket", "what is the difference between t20 and test cricket strategies", "how to choose cricket gear for juniors", "top clubs to watch in european football right now", "how to follow live football stats and commentary", "what nutrition helps football players recover faster", "how to handle pressure situations in penalty shootouts", "what are the safest ways to train during off season",
     // Camping in the Wild (25)
-    "best lightweight tents for backpacking",
-    "what to pack for a three day wild camping trip",
-    "how to build a safe campfire in the wilderness",
-    "tips for camping solo safely at night",
-    "how to choose a campsite away from hazards",
-    "what are essential first aid items for camping",
-    "how to find potable water while camping",
-    "best sleeping pads for cold weather camping",
-    "how to navigate with a map and compass",
-    "what food packs well for multi day hikes",
-    "how to store food safely to avoid wildlife encounters",
-    "best lightweight stoves for backpackers",
-    "how to set up a campsite in rainy conditions",
-    "what clothing layers are needed for alpine camping",
-    "how to treat minor injuries when far from help",
-    "best practices for Leave No Trace camping",
-    "how to identify local poisonous plants while camping",
-    "what are the pros and cons of hammock camping",
-    "how to plan a safe solo overnight hike route",
-    "what gadgets are worth carrying for wilderness camping",
-    "how to keep warm without a tent in an emergency",
-    "best ways to signal for help in the wild",
-    "how to prevent blisters on long hikes",
-    "what permits are typically needed for backcountry camping",
-    "how to choose a reliable headlamp for overnight trips",
-
+    "best lightweight tents for backpacking", "what to pack for a three day wild camping trip", "how to build a safe campfire in the wilderness", "tips for camping solo safely at night", "how to choose a campsite away from hazards", "what are essential first aid items for camping", "how to find potable water while camping", "best sleeping pads for cold weather camping", "how to navigate with a map and compass", "what food packs well for multi day hikes", "how to store food safely to avoid wildlife encounters", "best lightweight stoves for backpackers", "how to set up a campsite in rainy conditions", "what clothing layers are needed for alpine camping", "how to treat minor injuries when far from help", "best practices for Leave No Trace camping", "how to identify local poisonous plants while camping", "what are the pros and cons of hammock camping", "how to plan a safe solo overnight hike route", "what gadgets are worth carrying for wilderness camping", "how to keep warm without a tent in an emergency", "best ways to signal for help in the wild", "how to prevent blisters on long hikes", "what permits are typically needed for backcountry camping", "how to choose a reliable headlamp for overnight trips",
     // --- Extra phrases (100) ---
-    "how to plan a cross country road trip",
-    "best apps to track personal finance",
-    "how to grow herbs indoors year round",
-    "easy one pot meals for weeknights",
-    "how to start learning piano as an adult",
-    "tips for reducing household energy use",
-    "how to write a short story in a week",
-    "best practices for remote team communication",
-    "how to set SMART goals and stick to them",
-    "simple portrait photography tips",
-    "how to host a successful podcast episode",
-    "ways to improve indoor air quality",
-    "how to prepare for a technical interview",
-    "beginner guide to containerization with docker",
-    "how to read financial statements for beginners",
-    "tips for creating a minimalist wardrobe",
-    "how to do a basic home electrical repair safely",
-    "ways to practice mindful eating",
-    "how to make sourdough starter from scratch",
-    "best browser extensions for productivity",
-    "how to organize photos on your computer",
-    "easy watercolor painting techniques",
-    "how to backup your phone and cloud data",
-    "tips for long distance relationships",
-    "how to design a small urban garden",
-    "best study techniques backed by science",
-    "how to negotiate a salary increase",
-    "ways to learn a new language fast",
-    "how to build a simple mobile app",
-    "top security tips for home wifi networks",
-    "how to compost kitchen scraps at home",
-    "tips for staying focused while working from home",
-    "how to choose the right running shoes",
-    "easy knitting patterns for beginners",
-    "how to declutter your email inbox",
-    "tips for preparing quick healthy lunches",
-    "how to research family history online",
-    "best tools for creating wireframes",
-    "how to make cold brew coffee at home",
-    "ways to reduce single use plastics",
-    "how to perform basic bicycle maintenance",
-    "strategies for better time blocking",
-    "how to cultivate a reading habit",
-    "tips for improving public speaking skills",
-    "how to set up two factor authentication",
-    "best compact cameras for travel",
-    "how to build simple electronics projects",
-    "ways to support local small businesses",
-    "how to prepare for a marathon training plan",
-    "tips for photographing the night sky",
-    "how to build an emergency savings fund",
-    "creative gift ideas for friends",
-    "how to choose a good domain name",
-    "tips for managing inbox zero",
-    "how to create a basic API with nodejs",
-    "ways to grow plants from cuttings",
-    "how to turn a hobby into a side business",
-    "tips for cutting monthly subscription costs",
-    "how to map out a personal development plan",
-    "easy meal prep ideas for families",
-    "how to improve handwriting quickly",
-    "best online courses for data science beginners",
-    "how to build confidence before interviews",
-    "ways to make your resume stand out",
-    "how to take care of indoor succulents",
-    "tips for creating engaging social media content",
-    "how to plan a zero waste picnic",
-    "best practices for securing web applications",
-    "how to use git like a pro",
-    "easy vegetarian recipes for weeknights",
-    "how to choose a mattress for back pain",
-    "tips for learning calculus effectively",
-    "how to audit your personal finances",
-    "best habits for better mental health",
-    "how to build a basic wordpress site",
-    "ways to improve workplace ergonomics",
-    "how to prepare a beginner woodworking project",
-    "tips for saving for your first home",
-    "how to plan a culturally rich vacation",
-    "ways to create a capsule wardrobe",
-    "how to clean and maintain your camera lens",
-    "tips for building an online portfolio",
-    "how to brew kombucha at home safely",
-    "ways to practice coding every day",
-    "how to create a monthly budget spreadsheet",
-    "best stretches for desk workers",
-    "how to choose the right insurance coverage",
-    "tips for better sleep hygiene",
-    "how to teach kids to cook safely",
-    "ways to improve concentration during study",
-    "how to build a simple chatbot with javascript",
-    "tips for sustainable gift wrapping",
-    "how to identify reliable news sources",
-    "ways to reduce food waste at home",
-    "how to maintain a bike chain and gears",
-    "tips for staying hydrated throughout the day",
-    "how to choose a reliable used car",
-    "ways to create a calming bedtime routine",
-    "how to start a vertical herb garden",
-    "tips for photographing portraits with natural light",
-    "how to memorize speeches effectively",
-    "ways to set up a basic home lab for learning",
-    "how to run effective one on one meetings",
-    "tips for decorating small apartments",
-    "how to pick the perfect houseplant for beginners"
+    "how to plan a cross country road trip", "best apps to track personal finance", "how to grow herbs indoors year round", "easy one pot meals for weeknights", "how to start learning piano as an adult", "tips for reducing household energy use", "how to write a short story in a week", "best practices for remote team communication", "how to set SMART goals and stick to them", "simple portrait photography tips", "how to host a successful podcast episode", "ways to improve indoor air quality", "how to prepare for a technical interview", "beginner guide to containerization with docker", "how to read financial statements for beginners", "tips for creating a minimalist wardrobe", "how to do a basic home electrical repair safely", "ways to practice mindful eating", "how to make sourdough starter from scratch", "best browser extensions for productivity", "how to organize photos on your computer", "easy watercolor painting techniques", "how to backup your phone and cloud data", "tips for long distance relationships", "how to design a small urban garden", "best study techniques backed by science", "how to negotiate a salary increase", "ways to learn a new language fast", "how to build a simple mobile app", "top security tips for home wifi networks", "how to compost kitchen scraps at home", "tips for staying focused while working from home", "how to choose the right running shoes", "easy knitting patterns for beginners", "how to declutter your email inbox", "tips for preparing quick healthy lunches", "how to research family history online", "best tools for creating wireframes", "how to make cold brew coffee at home", "ways to reduce single use plastics", "how to perform basic bicycle maintenance", "strategies for better time blocking", "how to cultivate a reading habit", "tips for improving public speaking skills", "how to set up two factor authentication", "best compact cameras for travel", "how to build simple electronics projects", "ways to support local small businesses", "how to prepare for a marathon training plan", "tips for photographing the night sky", "how to build an emergency savings fund", "creative gift ideas for friends", "how to choose a good domain name", "tips for managing inbox zero", "how to create a basic API with nodejs", "ways to grow plants from cuttings", "how to turn a hobby into a side business", "tips for cutting monthly subscription costs",
+    "how to map out a personal development plan", "easy meal prep ideas for families", "how to improve handwriting quickly", "best online courses for data science beginners", "how to build confidence before interviews", "ways to make your resume stand out", "how to take care of indoor succulents", "tips for creating engaging social media content", "how to plan a zero waste picnic", "best practices for securing web applications", "how to use git like a pro", "easy vegetarian recipes for weeknights", "how to choose a mattress for back pain", "tips for learning calculus effectively", "how to audit your personal finances", "best habits for better mental health", "how to build a basic wordpress site", "ways to improve workplace ergonomics", "how to prepare a beginner woodworking project", "tips for saving for your first home", "how to plan a culturally rich vacation", "ways to create a capsule wardrobe", "how to clean and maintain your camera lens", "tips for building an online portfolio", "how to brew kombucha at home safely", "ways to practice coding every day", "how to create a monthly budget spreadsheet", "best stretches for desk workers", "how to choose the right insurance coverage", "tips for better sleep hygiene", "how to teach kids to cook safely", "ways to improve concentration during study", "how to build a simple chatbot with javascript", "tips for sustainable gift wrapping", "how to identify reliable news sources", "ways to reduce food waste at home", "how to maintain a bike chain and gears", "tips for staying hydrated throughout the day", "how to choose a reliable used car", "ways to create a calming bedtime routine", "how to start a vertical herb garden", "tips for photographing portraits with natural light", "how to memorize speeches effectively", "ways to set up a basic home lab for learning", "how to run effective one on one meetings", "tips for decorating small apartments", "how to pick the perfect houseplant for beginners"
   ];
 
   // --- Extra phrases (Grok Generated - 08-12-25) ---
   words.push(
-    "how to organize a garage sale effectively",
-    "best virtual reality headsets for beginners",
-    "what causes seasonal allergies and remedies",
-    "tips for starting a vegetable garden in spring",
-    "how to repair a leaky faucet at home",
-    "top rated noise cancelling headphones 2025",
-    "how to create digital art with free tools",
-    "benefits of practicing tai chi daily",
-    "how to select fresh seafood at the market",
-    "famous myths and legends from ancient greece",
-    "how to troubleshoot common printer issues",
-    "best electric cars for long distance travel",
-    "what is sustainable fashion and why it matters",
-    "easy crafts for kids using recycled materials",
-    "how to improve your credit score quickly",
-    "top destinations for winter skiing holidays",
-    "how to make vegan desserts without eggs",
-    "best wireless earbuds for workouts",
-    "what are the health benefits of yoga",
-    "how to set up a home recording studio",
-    "famous explorers and their discoveries",
-    "tips for packing light for international trips",
-    "how to brew beer at home for beginners",
-    "best smart home devices for security",
-    "what is cryptocurrency mining explained",
-    "how to draw realistic portraits step by step",
-    "top beaches for family vacations in asia",
-    "how to fix common smartphone battery problems",
-    "benefits of intermittent fasting for weight loss",
-    "how to start a blog and monetize it",
-    "famous composers from the classical era",
-    "tips for choosing the right pet for your family",
-    "how to make natural cleaning products",
-    "best fitness trackers for monitoring health",
-    "what is the history of the olympic games",
-    "how to learn sign language basics",
-    "top national parks in north america",
-    "how to upgrade your computer's ram",
-    "benefits of reading fiction books regularly",
-    "how to prepare for a job interview online",
-    "famous artists and their painting styles",
-    "tips for maintaining houseplants in low light",
-    "how to cook authentic mexican tacos",
-    "best drones for aerial photography",
-    "what is virtual reality therapy used for",
-    "how to build a treehouse for kids",
-    "top cities for street food around the world",
-    "how to reset forgotten passwords securely",
-    "benefits of walking barefoot on grass",
-    "how to create a family budget plan",
-    "famous battles in world war ii",
-    "tips for improving handwriting for adults",
-    "how to make soap at home naturally",
-    "best tablets for reading ebooks",
-    "what is the science behind rainbows",
-    "how to train for a 5k run as a beginner",
-    "top islands for honeymoon getaways",
-    "how to install solar panels on your roof",
-    "benefits of using essential oils daily",
-    "how to write poetry for beginners",
-    "famous inventions by women in history",
-    "tips for dealing with procrastination",
-    "how to bake gluten free bread",
-    "best smartwatches for android users",
-    "what is dark matter in the universe",
-    "how to start freelancing on graphic design",
-    "top museums for modern art in europe",
-    "how to fix a flat bicycle tire",
-    "benefits of journaling for mental health",
-    "how to plan a surprise birthday party",
-    "famous quotes from shakespeare plays",
-    "tips for safe online shopping practices",
-    "how to grow mushrooms at home",
-    "best cameras for vlogging beginners",
-    "what are black holes and how they form",
-    "how to learn chess openings effectively",
-    "top adventure sports destinations worldwide",
-    "how to troubleshoot wifi connection problems",
-    "benefits of eating organic fruits and veggies",
-    "how to create a vision board for goals",
-    "famous philosophers and their ideas",
-    "tips for organizing digital files efficiently",
-    "how to make fermented foods like kimchi",
-    "best monitors for graphic designers",
-    "what is the role of bees in ecosystems",
-    "how to prepare for natural disasters",
-    "top cultural festivals around the globe",
-    "how to replace a car battery safely",
-    "benefits of practicing gratitude daily",
-    "how to design logos using free software",
-    "famous novels adapted into tv series",
-    "tips for better time management at work",
-    "how to cook indian curry from scratch",
-    "best routers for home internet speed",
-    "what is climate change impact on oceans",
-    "how to start a book club with friends",
-    "top wildlife safaris in africa",
-    "how to clean jewelry at home",
-    "benefits of strength training for women",
-    "how to build a raised garden bed",
-    "famous scientists who changed the world",
-    "tips for reducing stress at work",
-    "how to make candles at home easily",
-    "best speakers for home theater setup",
-    "what is the history of chocolate",
-    "how to learn ballroom dancing steps",
-    "top romantic getaways in europe",
-    "how to secure your email account",
-    "benefits of cold showers for health",
-    "how to create a workout playlist",
-    "famous landmarks in south america",
-    "tips for eco friendly living habits",
-    "how to grill perfect steaks outdoors",
-    "best laptops for video editing 2025",
-    "what is the origin of halloween",
-    "how to meditate for focus and clarity",
-    "top ski resorts in the alps",
-    "how to change a car's oil filter",
-    "benefits of herbal teas for sleep",
-    "how to write a business plan template",
-    "famous musicians from the jazz era",
-    "tips for packing for a cruise vacation",
-    "how to make yogurt at home",
-    "best headphones for music production",
-    "what are solar eclipses and safety tips",
-    "how to improve public speaking confidence",
-    "top vineyards for wine tasting tours",
-    "how to backup computer files securely",
-    "benefits of cycling for cardiovascular health",
-    "how to plan a backyard wedding",
-    "famous poems about nature and life",
-    "tips for choosing sustainable clothing",
-    "how to prepare sushi rolls at home",
-    "best projectors for home movies",
-    "what is the life cycle of stars",
-    "how to start investing in real estate",
-    "top hot springs destinations worldwide",
-    "how to fix common plumbing issues",
-    "benefits of aromatherapy for relaxation",
-    "how to create custom greeting cards",
-    "famous historical figures in asia",
-    "tips for better email communication",
-    "how to grow orchids indoors successfully",
-    "best fitness apps for home workouts",
-    "what is the theory of evolution simplified",
-    "how to learn photography composition rules",
-    "top desert safari experiences in dubai",
-    "how to install antivirus software properly",
-    "benefits of laughter yoga sessions",
-    "how to organize a charity fundraiser",
-    "famous bridges around the world",
-    "tips for healthy snacking options",
-    "how to make pasta sauce from tomatoes",
-    "best smart thermostats for energy savings",
-    "what are comets and meteor showers",
-    "how to train a cat to use litter box",
-    "top ancient ruins to visit in mexico",
-    "how to troubleshoot laptop overheating",
-    "benefits of deep breathing exercises",
-    "how to build a birdhouse diy project",
-    "famous inventions from the renaissance",
-    "tips for virtual meeting etiquette",
-    "how to cook thai stir fry dishes",
-    "best external hard drives for storage",
-    "what is the human genome project",
-    "how to start a meditation journal",
-    "top coral reefs for snorkeling",
-    "how to replace screen on a phone",
-    "benefits of probiotics for gut health",
-    "how to plan a group hiking trip",
-    "famous quotes on success and failure",
-    "tips for reducing plastic in kitchens",
-    "how to bake sourdough pizza dough",
-    "best webcams for video calls",
-    "what is string theory in physics",
-    "how to learn basic sewing skills",
-    "top flower festivals in the netherlands",
-    "how to optimize smartphone storage",
-    "benefits of forest bathing therapy",
-    "how to create a home office setup",
-    "famous volcanoes and their eruptions",
-    "tips for mindful parenting techniques",
-    "how to make herbal infusions",
-    "best action cameras for adventures",
-    "what are galaxies and their types",
-    "how to improve running endurance",
-    "top eco lodges for sustainable travel",
-    "how to clean a microwave effectively",
-    "benefits of omega 3 fatty acids",
-    "how to write effective cover letters",
-    "famous operas and their composers",
-    "tips for budget travel in europe",
-    "how to grow strawberries in pots",
-    "best power banks for charging devices",
-    "what is the big bang theory explained",
-    "how to start a vegetable juicing routine",
-    "top canyons for hiking in usa",
-    "how to fix blurry photos in editing",
-    "benefits of acupuncture for pain relief",
-    "how to organize closet space efficiently",
-    "famous rivers and their significance",
-    "tips for learning guitar scales",
-    "how to make fruit jams at home",
-    "best vr games for fitness",
-    "what is relativity theory by einstein",
-    "how to prepare for college entrance exams",
-    "top aurora viewing spots in scandinavia",
-    "how to secure home network from hackers",
-    "benefits of vitamin d supplements",
-    "how to build a compost bin diy",
-    "famous deserts around the world",
-    "tips for effective note taking methods",
-    "how to cook middle eastern falafel",
-    "best bluetooth speakers for outdoors",
-    "what are supernovas and their effects",
-    "how to learn digital marketing basics",
-    "top mountain biking trails in colorado",
-    "how to troubleshoot tv remote issues",
-    "benefits of mindfulness apps for beginners",
-    "how to plan a themed dinner party",
-    "famous islands in the pacific ocean",
-    "tips for improving sleep quality naturally",
-    "how to make cheese at home simply",
-    "best fitness bikes for commuting",
-    "what is the water cycle process",
-    "how to start a podcast on spotify",
-    "top whale watching tours in alaska",
-    "how to clean grout in bathroom tiles",
-    "benefits of turmeric for inflammation",
-    "how to create a linkedin profile",
-    "famous mountains for climbing expeditions",
-    "tips for healthy hair care routines",
-    "how to bake vegan cookies easily",
-    "best gaming mice for precision",
-    "what are asteroids and their orbits",
-    "how to improve vocabulary daily",
-    "top lavender fields in provence france",
-    "how to install home security cameras",
-    "benefits of green smoothies for detox",
-    "how to organize a community cleanup",
-    "famous lakes for boating activities",
-    "tips for starting a fitness challenge",
-    "how to make natural face masks",
-    "best e readers for book lovers",
-    "what is plate tectonics theory",
-    "how to learn basic html coding",
-    "top cherry blossom spots in japan",
-    "how to fix squeaky door hinges",
-    "benefits of pilates for core strength",
-    "how to plan a solo travel adventure",
-    "famous waterfalls in south america",
-    "tips for better posture at desk",
-    "how to cook greek souvlaki skewers",
-    "best portable chargers for travel",
-    "what is photosynthesis in plants",
-    "how to start investing in etfs",
-    "top tulip farms in the netherlands",
-    "how to troubleshoot earbud sound issues",
-    "benefits of chia seeds in diet",
-    "how to build a sandcastle like pro",
-    "famous canyons in the grand canyon area",
-    "tips for creative writing prompts",
-    "how to make iced tea variations",
-    "best mechanical keyboards for typing",
-    "what are pulsars in astronomy",
-    "how to prepare for a hiking marathon",
-    "top autumn foliage spots in new england",
-    "how to clean silverware naturally",
-    "benefits of meditation apps for anxiety",
-    "how to create a personal website"
+    "how to organize a garage sale effectively", "best virtual reality headsets for beginners", "what causes seasonal allergies and remedies", "tips for starting a vegetable garden in spring", "how to repair a leaky faucet at home", "top rated noise cancelling headphones 2025", "how to create digital art with free tools", "benefits of practicing tai chi daily", "how to select fresh seafood at the market", "famous myths and legends from ancient greece", "how to troubleshoot common printer issues", "best electric cars for long distance travel", "what is sustainable fashion and why it matters", "easy crafts for kids using recycled materials", "how to improve your credit score quickly", "top destinations for winter skiing holidays", "how to make vegan desserts without eggs", "best wireless earbuds for workouts", "what are the health benefits of yoga", "how to set up a home recording studio", "famous explorers and their discoveries", "tips for packing light for international trips", "how to brew beer at home for beginners", "best smart home devices for security", "what is cryptocurrency mining explained", "how to draw realistic portraits step by step", "top beaches for family vacations in asia", "how to fix common smartphone battery problems", "benefits of intermittent fasting for weight loss", "how to start a blog and monetize it", "famous composers from the classical era", "tips for choosing the right pet for your family", "how to make natural cleaning products", "best fitness trackers for monitoring health", "what is the history of the olympic games", "how to learn sign language basics", "top national parks in north america", "how to upgrade your computer's ram", "benefits of reading fiction books regularly", "how to prepare for a job interview online", "famous artists and their painting styles", "tips for maintaining houseplants in low light", "how to cook authentic mexican tacos", "best drones for aerial photography", "what is virtual reality therapy used for", "how to build a treehouse for kids", "top cities for street food around the world", "how to reset forgotten passwords securely", "benefits of walking barefoot on grass", "how to create a family budget plan", "famous battles in world war ii", "tips for improving handwriting for adults", "how to make soap at home naturally", "best tablets for reading ebooks", "what is the science behind rainbows",
+    "how to train for a 5k run as a beginner", "top islands for honeymoon getaways", "how to install solar panels on your roof", "benefits of using essential oils daily", "how to write poetry for beginners", "famous inventions by women in history", "tips for dealing with procrastination", "how to bake gluten free bread", "best smartwatches for android users", "what is dark matter in the universe", "how to start freelancing on graphic design", "top museums for modern art in europe", "how to fix a flat bicycle tire", "benefits of journaling for mental health", "how to plan a surprise birthday party", "famous quotes from shakespeare plays", "tips for safe online shopping practices", "how to grow mushrooms at home", "best cameras for vlogging beginners", "what are black holes and how they form", "how to learn chess openings effectively", "top adventure sports destinations worldwide", "how to troubleshoot wifi connection problems", "benefits of eating organic fruits and veggies", "how to create a vision board for goals", "famous philosophers and their ideas", "tips for organizing digital files efficiently", "how to make fermented foods like kimchi", "best monitors for graphic designers", "what is the role of bees in ecosystems", "how to prepare for natural disasters", "top cultural festivals around the globe", "how to replace a car battery safely", "benefits of practicing gratitude daily", "how to design logos using free software", "famous novels adapted into tv series", "tips for better time management at work", "how to cook indian curry from scratch", "best routers for home internet speed", "what is climate change impact on oceans", "how to start a book club with friends", "top wildlife safaris in africa", "how to clean jewelry at home", "benefits of strength training for women", "how to build a raised garden bed", "famous scientists who changed the world", "tips for reducing stress at work", "how to make candles at home easily", "best speakers for home theater setup", "what is the history of chocolate", "how to learn ballroom dancing steps", "top romantic getaways in europe", "how to secure your email account", "benefits of cold showers for health", "how to create a workout playlist", "famous landmarks in south america", "tips for eco friendly living habits", "how to grill perfect steaks outdoors",
+    "best laptops for video editing 2025", "what is the origin of halloween", "how to meditate for focus and clarity", "top ski resorts in the alps", "how to change a car's oil filter", "benefits of herbal teas for sleep", "how to write a business plan template", "famous musicians from the jazz era", "tips for packing for a cruise vacation", "how to make yogurt at home", "best headphones for music production", "what are solar eclipses and safety tips", "how to improve public speaking confidence", "top vineyards for wine tasting tours", "how to backup computer files securely", "benefits of cycling for cardiovascular health", "how to plan a backyard wedding", "famous poems about nature and life", "tips for choosing sustainable clothing", "how to prepare sushi rolls at home", "best projectors for home movies", "what is the life cycle of stars", "how to start investing in real estate", "top hot springs destinations worldwide", "how to fix common plumbing issues", "benefits of aromatherapy for relaxation", "how to create custom greeting cards", "famous historical figures in asia", "tips for better email communication", "how to grow orchids indoors successfully", "best fitness apps for home workouts", "what is the theory of evolution simplified", "how to learn photography composition rules", "top desert safari experiences in dubai", "how to install antivirus software properly", "benefits of laughter yoga sessions", "how to organize a charity fundraiser", "famous bridges around the world", "tips for healthy snacking options", "how to make pasta sauce from tomatoes", "best smart thermostats for energy savings", "what are comets and meteor showers", "how to train a cat to use litter box", "top ancient ruins to visit in mexico", "how to troubleshoot laptop overheating", "benefits of deep breathing exercises", "how to build a birdhouse diy project", "famous inventions from the renaissance", "tips for virtual meeting etiquette", "how to cook thai stir fry dishes", "best external hard drives for storage", "what is the human genome project", "how to start a meditation journal", "top coral reefs for snorkeling", "how to replace screen on a phone", "benefits of probiotics for gut health", "how to plan a group hiking trip", "famous quotes on success and failure", "tips for reducing plastic in kitchens",
+    "how to bake sourdough pizza dough", "best webcams for video calls", "what is string theory in physics", "how to learn basic sewing skills", "top flower festivals in the netherlands", "how to optimize smartphone storage", "benefits of forest bathing therapy", "how to create a home office setup", "famous volcanoes and their eruptions", "tips for mindful parenting techniques", "how to make herbal infusions", "best action cameras for adventures", "what are galaxies and their types", "how to improve running endurance", "top eco lodges for sustainable travel", "how to clean a microwave effectively", "benefits of omega 3 fatty acids", "how to write effective cover letters", "famous operas and their composers", "tips for budget travel in europe", "how to grow strawberries in pots", "best power banks for charging devices", "what is the big bang theory explained", "how to start a vegetable juicing routine", "top canyons for hiking in usa", "how to fix blurry photos in editing", "benefits of acupuncture for pain relief", "how to organize closet space efficiently", "famous rivers and their significance", "tips for learning guitar scales", "how to make fruit jams at home", "best vr games for fitness", "what is relativity theory by einstein", "how to prepare for college entrance exams", "top aurora viewing spots in scandinavia", "how to secure home network from hackers", "benefits of vitamin d supplements", "how to build a compost bin diy", "famous deserts around the world", "tips for effective note taking methods", "how to cook middle eastern falafel", "best bluetooth speakers for outdoors", "what are supernovas and their effects", "how to learn digital marketing basics", "top mountain biking trails in colorado", "how to troubleshoot tv remote issues", "benefits of mindfulness apps for beginners", "how to plan a themed dinner party", "famous islands in the pacific ocean", "tips for improving sleep quality naturally", "how to make cheese at home simply", "best fitness bikes for commuting", "what is the water cycle process", "how to start a podcast on spotify", "top whale watching tours in alaska", "how to clean grout in bathroom tiles", "benefits of turmeric for inflammation", "how to create a linkedin profile", "famous mountains for climbing expeditions", "tips for healthy hair care routines",
+    "how to bake vegan cookies easily", "best gaming mice for precision", "what are asteroids and their orbits", "how to improve vocabulary daily", "top lavender fields in provence france", "how to install home security cameras", "benefits of green smoothies for detox", "how to organize a community cleanup", "famous lakes for boating activities", "tips for starting a fitness challenge", "how to make natural face masks", "best e readers for book lovers", "what is plate tectonics theory", "how to learn basic html coding", "top cherry blossom spots in japan", "how to fix squeaky door hinges", "benefits of pilates for core strength", "how to plan a solo travel adventure", "famous waterfalls in south america", "tips for better posture at desk", "how to cook greek souvlaki skewers", "best portable chargers for travel", "what is photosynthesis in plants", "how to start investing in etfs", "top tulip farms in the netherlands", "how to troubleshoot earbud sound issues", "benefits of chia seeds in diet", "how to build a sandcastle like pro", "famous canyons in the grand canyon area", "tips for creative writing prompts", "how to make iced tea variations", "best mechanical keyboards for typing", "what are pulsars in astronomy", "how to prepare for a hiking marathon", "top autumn foliage spots in new england", "how to clean silverware naturally", "benefits of meditation apps for anxiety", "how to create a personal website"
   );
 
   // --- Extra phrases (Qwen Generated - 08-12-25) ---
   words.push(
     // 🌍 Global & Cultural (25)
-    "traditional tea ceremonies in japan and their meaning",
-    "how indigenous communities manage land sustainably",
-    "what is ubuntu philosophy and how is it applied",
-    "best ways to respectfully visit sacred sites abroad",
-    "origins of diwali and regional celebration differences",
-    "how to learn sign language basics for travel",
-    "what are geisha roles in modern kyoto",
-    "cultural etiquette tips for visiting temples in southeast asia",
-    "history behind day of the dead in mexico",
-    "how to identify authentic vs mass produced handicrafts",
-    "meaning of henna patterns in different cultures",
-    "traditional music instruments unique to west africa",
-    "what is fika and why it matters in swedish culture",
-    "how to participate in a japanese onsen correctly",
-    "significance of uluru to aboriginal australians",
-    "common gestures to avoid in middle eastern countries",
-    "how to respectfully photograph people in rural communities",
-    "origins of capoeira and its cultural resistance roots",
-    "meaning behind maori tattoos and protocols",
-    "what is hygge and how danes practice it year round",
-    "how to prepare for ramadan as a non muslim visitor",
-    "traditional fermented foods from the caucasus region",
-    "history of berber carpets and symbolism in designs",
-    "how to support fair trade artisans ethically",
-    "what is joik and its place in sami identity",
-
+    "traditional tea ceremonies in japan and their meaning", "how indigenous communities manage land sustainably", "what is ubuntu philosophy and how is it applied", "best ways to respectfully visit sacred sites abroad", "origins of diwali and regional celebration differences", "how to learn sign language basics for travel", "what are geisha roles in modern kyoto", "cultural etiquette tips for visiting temples in southeast asia", "history behind day of the dead in mexico", "how to identify authentic vs mass produced handicrafts", "meaning of henna patterns in different cultures", "traditional music instruments unique to west africa", "what is fika and why it matters in swedish culture", "how to participate in a japanese onsen correctly", "significance of uluru to aboriginal australians", "common gestures to avoid in middle eastern countries", "how to respectfully photograph people in rural communities", "origins of capoeira and its cultural resistance roots", "meaning behind maori tattoos and protocols", "what is hygge and how danes practice it year round", "how to prepare for ramadan as a non muslim visitor", "traditional fermented foods from the caucasus region", "history of berber carpets and symbolism in designs", "how to support fair trade artisans ethically", "what is joik and its place in sami identity",
     // 🔬 Science & Nature Deep Dives (25)
-    "how tardigrades survive extreme space conditions",
-    "what causes bioluminescent waves at night",
-    "how do trees communicate through underground networks",
-    "why some animals can regenerate limbs but humans cant",
-    "how deep sea creatures adapt to zero light environments",
-    "what is the role of fungi in forest ecosystems",
-    "how monarch butterflies navigate thousands of miles",
-    "why do octopuses have three hearts and blue blood",
-    "how coral reefs recover after bleaching events",
-    "what are extremophiles and where do they live",
-    "how do bees perceive color differently than humans",
-    "why do leaves change color in autumn scientifically",
-    "how do migratory birds sense earths magnetic field",
-    "what causes ball lightning and is it real",
-    "how scientists track microplastics in ocean currents",
-    "why some frogs freeze solid in winter and revive",
-    "how do deep ocean vents support life without sunlight",
-    "what is the biological purpose of yawning",
-    "how do chameleons change color at cellular level",
-    "why do some plants bloom only once in decades",
-    "how do bats use echolocation in noisy environments",
-    "what is the science behind aurora borealis colors",
-    "how do ants farm fungi in underground colonies",
-    "why do sloths move so slowly from an energy perspective",
-    "how do scientists date ancient ice cores",
-
+    "how tardigrades survive extreme space conditions", "what causes bioluminescent waves at night", "how do trees communicate through underground networks", "why some animals can regenerate limbs but humans cant", "how deep sea creatures adapt to zero light environments", "what is the role of fungi in forest ecosystems", "how monarch butterflies navigate thousands of miles", "why do octopuses have three hearts and blue blood", "how coral reefs recover after bleaching events", "what are extremophiles and where do they live", "how do bees perceive color differently than humans", "why do leaves change color in autumn scientifically", "how do migratory birds sense earths magnetic field", "what causes ball lightning and is it real", "how scientists track microplastics in ocean currents", "why some frogs freeze solid in winter and revive", "how do deep ocean vents support life without sunlight", "what is the biological purpose of yawning", "how do chameleons change color at cellular level", "why do some plants bloom only once in decades", "how do bats use echolocation in noisy environments", "what is the science behind aurora borealis colors", "how do ants farm fungi in underground colonies", "why do sloths move so slowly from an energy perspective", "how do scientists date ancient ice cores",
     // 🧠 Mental Wellness & Neurodiversity (25)
-    "how to create a sensory friendly workspace at home",
-    "what is rejection sensitive dysphoria and how to cope",
-    "ways to support autistic adults in social settings",
-    "how grounding techniques differ for anxiety vs panic attacks",
-    "what is interoceptive awareness and why it matters",
-    "how to set boundaries without guilt in relationships",
-    "best non verbal communication tools for non speaking individuals",
-    "how to recognize emotional burnout before it peaks",
-    "what is polyvagal theory and practical applications",
-    "ways to build distress tolerance for chronic illness",
-    "how to practice self compassion after failure",
-    "what is neuroaffirming language and examples",
-    "how to design a calming corner for emotional regulation",
-    "ways to reduce decision fatigue in daily life",
-    "what is somatic experiencing and who benefits",
-    "how to identify toxic positivity in conversations",
-    "best journaling prompts for identity exploration",
-    "how to support someone with misophonia daily",
-    "what is executive dysfunction and actionable strategies",
-    "ways to co regulate emotions with children",
-    "how to create a personal emotional first aid kit",
-    "what is inner child work and how to start",
-    "how to navigate grief anniversaries mindfully",
-    "ways to reduce shame spirals using cognitive tools",
-    "what is radical acceptance in dbt and real life use",
-
+    "how to create a sensory friendly workspace at home", "what is rejection sensitive dysphoria and how to cope", "ways to support autistic adults in social settings", "how grounding techniques differ for anxiety vs panic attacks", "what is interoceptive awareness and why it matters", "how to set boundaries without guilt in relationships", "best non verbal communication tools for non speaking individuals", "how to recognize emotional burnout before it peaks", "what is polyvagal theory and practical applications", "ways to build distress tolerance for chronic illness", "how to practice self compassion after failure", "what is neuroaffirming language and examples", "how to design a calming corner for emotional regulation", "ways to reduce decision fatigue in daily life", "what is somatic experiencing and who benefits", "how to identify toxic positivity in conversations", "best journaling prompts for identity exploration", "how to support someone with misophonia daily", "what is executive dysfunction and actionable strategies", "ways to co regulate emotions with children", "how to create a personal emotional first aid kit", "what is inner child work and how to start", "how to navigate grief anniversaries mindfully", "ways to reduce shame spirals using cognitive tools", "what is radical acceptance in dbt and real life use",
     // 🛠️ Niche DIY & Maker Projects (25)
-    "how to build a passive solar dehydrator from scrap wood",
-    "diy natural dye techniques using kitchen waste",
-    "how to make reusable beeswax food wraps step by step",
-    "build a rainwater catchment system for balcony gardening",
-    "how to upcycle old sweaters into warm mittens",
-    "diy clay soil moisture sensor with arduino nano",
-    "how to create a vertical pallet herb wall indoors",
-    "build a silent mechanical keyboard from kits",
-    "how to make non toxic wood polish with citrus peels",
-    "diy solar phone charger using recycled panels",
-    "how to repurpose wine corks into bulletin boards",
-    "build a compact compost tumbler from plastic drums",
-    "how to craft leather journal covers without stitching",
-    "diy acoustic panels using fabric and insulation",
-    "how to make seed paper embedded with wildflowers",
-    "build a foldable camping stool from bamboo",
-    "how to turn old maps into waterproof book covers",
-    "diy magnetic knife strip from reclaimed wood",
-    "how to create a cork yoga block at home",
-    "build a minimalist floating shelf with hidden brackets",
-    "how to make herbal infused vinegar cleaners",
-    "diy plant propagation station from glass jars",
-    "how to craft a macrame plant hanger with recycled yarn",
-    "build a small batch sourdough starter jar holder",
-    "how to turn vintage tins into travel sewing kits",
-
+    "how to build a passive solar dehydrator from scrap wood", "diy natural dye techniques using kitchen waste", "how to make reusable beeswax food wraps step by step", "build a rainwater catchment system for balcony gardening", "how to upcycle old sweaters into warm mittens", "diy clay soil moisture sensor with arduino nano", "how to create a vertical pallet herb wall indoors", "build a silent mechanical keyboard from kits", "how to make non toxic wood polish with citrus peels", "diy solar phone charger using recycled panels", "how to repurpose wine corks into bulletin boards", "build a compact compost tumbler from plastic drums", "how to craft leather journal covers without stitching", "diy acoustic panels using fabric and insulation", "how to make seed paper embedded with wildflowers", "build a foldable camping stool from bamboo", "how to turn old maps into waterproof book covers", "diy magnetic knife strip from reclaimed wood", "how to create a cork yoga block at home", "build a minimalist floating shelf with hidden brackets", "how to make herbal infused vinegar cleaners", "diy plant propagation station from glass jars", "how to craft a macrame plant hanger with recycled yarn", "build a small batch sourdough starter jar holder", "how to turn vintage tins into travel sewing kits",
     // 💻 Emerging Tech & Digital Ethics (25)
-    "how decentralized identity works without big tech",
-    "what is differential privacy and how apple uses it",
-    "how to audit an ai models bias before deployment",
-    "what are zk proofs and their role in web3 privacy",
-    "how to detect deepfake audio in voice messages",
-    "what is federated learning and real world use cases",
-    "how digital twins simulate cities for climate planning",
-    "what are algorithmic impact assessments and who does them",
-    "how to verify provenance of digital art on blockchain",
-    "what is homomorphic encryption and its limitations",
-    "how satellite internet constellations affect astronomy",
-    "what are ethical guidelines for generative ai in journalism",
-    "how to check if your data is in a training dataset",
-    "what is edge ai and why it matters for rural areas",
-    "how open source models differ in transparency from closed ones",
-    "what are data cooperatives and how they empower users",
-    "how to opt out of ai training in major platforms",
-    "what is neuromorphic computing and current prototypes",
-    "how ai is used in detecting illegal fishing from space",
-    "what are model cards and why developers should publish them",
-    "how to interpret ai confidence scores responsibly",
-    "what is synthetic data and when it replaces real data",
-    "how digital detox apps respect privacy while helping",
-    "what are right to repair laws and global status",
-    "how to identify greenwashing in tech sustainability reports",
-
+    "how decentralized identity works without big tech", "what is differential privacy and how apple uses it", "how to audit an ai models bias before deployment", "what are zk proofs and their role in web3 privacy", "how to detect deepfake audio in voice messages", "what is federated learning and real world use cases", "how digital twins simulate cities for climate planning", "what are algorithmic impact assessments and who does them", "how to verify provenance of digital art on blockchain", "what is homomorphic encryption and its limitations", "how satellite internet constellations affect astronomy", "what are ethical guidelines for generative ai in journalism", "how to check if your data is in a training dataset", "what is edge ai and why it matters for rural areas", "how open source models differ in transparency from closed ones", "what are data cooperatives and how they empower users", "how to opt out of ai training in major platforms", "what is neuromorphic computing and current prototypes", "how ai is used in detecting illegal fishing from space", "what are model cards and why developers should publish them", "how to interpret ai confidence scores responsibly", "what is synthetic data and when it replaces real data", "how digital detox apps respect privacy while helping", "what are right to repair laws and global status", "how to identify greenwashing in tech sustainability reports",
     // 🌱 Regenerative Living & Sustainability (25)
-    "how to create a food forest in a suburban backyard",
-    "what is mycoremediation and how mushrooms clean soil",
-    "how to build a hugelkultur bed for water retention",
-    "ways to reduce textile waste by mending creatively",
-    "how to start a community seed library legally",
-    "what is regenerative grazing and how it reverses desertification",
-    "how to compost human waste safely with composting toilets",
-    "ways to convert lawns into native pollinator habitats",
-    "how to make natural pest repellent with companion planting",
-    "what is circular fashion and how to participate",
-    "how to calculate your personal water footprint accurately",
-    "ways to retrofit old homes for passive cooling",
-    "how to support indigenous led conservation efforts",
-    "what is solarpunk and its practical design principles",
-    "how to organize a repair cafe in your neighborhood",
-    "ways to reduce pharmaceutical waste in households",
-    "how to start a neighborhood tool lending library",
-    "what is biomimicry in architecture and real examples",
-    "how to make natural dyes last longer on fabrics",
-    "ways to advocate for plastic free aisles in supermarkets",
-    "how to assess greenwashing in eco product labels",
-    "what is doughnut economics and city applications",
-    "how to create a zero waste wedding without compromise",
-    "ways to reduce emissions from digital activities",
-    "how to support carbon insetting vs offsetting projects",
-
+    "how to create a food forest in a suburban backyard", "what is mycoremediation and how mushrooms clean soil", "how to build a hugelkultur bed for water retention", "ways to reduce textile waste by mending creatively", "how to start a community seed library legally", "what is regenerative grazing and how it reverses desertification", "how to compost human waste safely with composting toilets", "ways to convert lawns into native pollinator habitats", "how to make natural pest repellent with companion planting", "what is circular fashion and how to participate", "how to calculate your personal water footprint accurately", "ways to retrofit old homes for passive cooling", "how to support indigenous led conservation efforts", "what is solarpunk and its practical design principles", "how to organize a repair cafe in your neighborhood", "ways to reduce pharmaceutical waste in households", "how to start a neighborhood tool lending library", "what is biomimicry in architecture and real examples", "how to make natural dyes last longer on fabrics", "ways to advocate for plastic free aisles in supermarkets", "how to assess greenwashing in eco product labels", "what is doughnut economics and city applications", "how to create a zero waste wedding without compromise", "ways to reduce emissions from digital activities", "how to support carbon insetting vs offsetting projects",
     // 📚 Learning & Unschooling Approaches (25)
-    "how unschooling families document learning for legality",
-    "what is strewing and how to do it effectively",
-    "ways to nurture curiosity in teens without curriculum",
-    "how to use video games as historical learning tools",
-    "what is interest led learning and long term outcomes",
-    "how to facilitate nature journaling for all ages",
-    "ways to integrate math into daily life unconsciously",
-    "how to create a learning rich environment at home",
-    "what is deschooling and how long it typically takes",
-    "how to support neurodivergent learners in self direction",
-    "ways to use libraries as hubs for project based learning",
-    "how to evaluate open educational resources critically",
-    "what is connected learning and examples in practice",
-    "how to mentor youth in passion projects without directing",
-    "ways to foster critical media literacy from childhood",
-    "how to use podcasts as springboards for deep inquiry",
-    "what is place based education and community benefits",
-    "how to design personal learning dashboards for teens",
-    "ways to support multilingual development at home",
-    "how to turn travel into immersive learning experiences",
-    "what is slow education and its contrast to standardized testing",
-    "how to use citizen science projects for real contribution",
-    "ways to assess learning without grades or tests",
-    "how to create intergenerational learning circles",
-    "what is autodidactism and tools for lifelong self education",
-
+    "how unschooling families document learning for legality", "what is strewing and how to do it effectively", "ways to nurture curiosity in teens without curriculum", "how to use video games as historical learning tools", "what is interest led learning and long term outcomes", "how to facilitate nature journaling for all ages", "ways to integrate math into daily life unconsciously", "how to create a learning rich environment at home", "what is deschooling and how long it typically takes", "how to support neurodivergent learners in self direction", "ways to use libraries as hubs for project based learning", "how to evaluate open educational resources critically", "what is connected learning and examples in practice", "how to mentor youth in passion projects without directing", "ways to foster critical media literacy from childhood", "how to use podcasts as springboards for deep inquiry", "what is place based education and community benefits", "how to design personal learning dashboards for teens", "ways to support multilingual development at home", "how to turn travel into immersive learning experiences", "what is slow education and its contrast to standardized testing", "how to use citizen science projects for real contribution", "ways to assess learning without grades or tests", "how to create intergenerational learning circles", "what is autodidactism and tools for lifelong self education",
     // 🎨 Creative Expression & Art Therapy (25)
-    "how to use zentangle for anxiety reduction",
-    "what is intuitive painting and how to begin without fear",
-    "ways to create art with natural materials sustainably",
-    "how to journal with collage for emotional processing",
-    "what is bibliotherapy and how to apply it personally",
-    "how to use clay work for somatic trauma release",
-    "ways to explore identity through self portrait variations",
-    "how to create a visual mood board for life transitions",
-    "what is process art and why outcome doesnt matter",
-    "how to use sound baths as creative inspiration",
-    "ways to integrate movement and mark making",
-    "how to make altered books for personal storytelling",
-    "what is eco printing and how to do it at home",
-    "how to use photography as mindfulness practice",
-    "ways to create art with voice recordings and transcripts",
-    "how to build a personal symbolism dictionary",
-    "what is embodied drawing and guided exercises",
-    "how to use poetry prompts for grief expression",
-    "ways to make collaborative art with strangers online",
-    "how to create a tactile memory box for nostalgia",
-    "what is art journaling and starter prompts",
-    "how to use color psychology in daily creative choices",
-    "ways to turn field notes into mixed media pieces",
-    "how to practice daily sketch noting for retention",
-    "what is asemic writing and how to experiment",
-
+    "how to use zentangle for anxiety reduction", "what is intuitive painting and how to begin without fear", "ways to create art with natural materials sustainably", "how to journal with collage for emotional processing", "what is bibliotherapy and how to apply it personally", "how to use clay work for somatic trauma release", "ways to explore identity through self portrait variations", "how to create a visual mood board for life transitions", "what is process art and why outcome doesnt matter", "how to use sound baths as creative inspiration", "ways to integrate movement and mark making", "how to make altered books for personal storytelling", "what is eco printing and how to do it at home", "how to use photography as mindfulness practice", "ways to create art with voice recordings and transcripts", "how to build a personal symbolism dictionary", "what is embodied drawing and guided exercises", "how to use poetry prompts for grief expression", "ways to make collaborative art with strangers online", "how to create a tactile memory box for nostalgia", "what is art journaling and starter prompts", "how to use color psychology in daily creative choices", "ways to turn field notes into mixed media pieces", "how to practice daily sketch noting for retention", "what is asemic writing and how to experiment",
     // 🥾 Adventure & Micro-Outdoors (25)
-    "how to plan a safe urban foraging walk in your city",
-    "what to pack for a spontaneous overnight bikepacking trip",
-    "ways to practice forest bathing without forests nearby",
-    "how to identify bird calls using free apps accurately",
-    "what is geocaching and beginner tips for families",
-    "how to build a tiny floating raft for calm waters",
-    "ways to sleep under stars in light polluted areas",
-    "how to navigate using stars in northern hemisphere",
-    "what is plogging and how to start a local group",
-    "how to create a backyard wildlife camera trap",
-    "ways to hike silently to observe more wildlife",
-    "how to make a natural insect repellent for ticks",
-    "what is shinrin yoku and measurable health benefits",
-    "how to identify edible weeds in sidewalk cracks",
-    "ways to practice cold water immersion safely at home",
-    "how to build a debris shelter in under 30 minutes",
-    "what is peak bagging and ethical considerations",
-    "how to photograph dew drops on spiderwebs at dawn",
-    "ways to turn lunch breaks into micro adventures",
-    "how to recognize animal tracks in mud and snow",
-    "what is solastalgia and connection to place loss",
-    "how to prepare for a solo day hike with minimal gear",
-    "ways to explore your neighborhood like a tourist",
-    "how to make a solar oven from a pizza box",
-    "what is biophilia and designing spaces that nurture it",
-
+    "how to plan a safe urban foraging walk in your city", "what to pack for a spontaneous overnight bikepacking trip", "ways to practice forest bathing without forests nearby", "how to identify bird calls using free apps accurately", "what is geocaching and beginner tips for families", "how to build a tiny floating raft for calm waters", "ways to sleep under stars in light polluted areas", "how to navigate using stars in northern hemisphere", "what is plogging and how to start a local group", "how to create a backyard wildlife camera trap", "ways to hike silently to observe more wildlife", "how to make a natural insect repellent for ticks", "what is shinrin yoku and measurable health benefits", "how to identify edible weeds in sidewalk cracks", "ways to practice cold water immersion safely at home", "how to build a debris shelter in under 30 minutes", "what is peak bagging and ethical considerations", "how to photograph dew drops on spiderwebs at dawn", "ways to turn lunch breaks into micro adventures", "how to recognize animal tracks in mud and snow", "what is solastalgia and connection to place loss", "how to prepare for a solo day hike with minimal gear", "ways to explore your neighborhood like a tourist", "how to make a solar oven from a pizza box", "what is biophilia and designing spaces that nurture it",
     // 🍽️ Food Science & Culinary Heritage (25)
-    "how fermentation changes nutritional profile of soy",
-    "what is nixtamalization and why it matters for corn",
-    "ways to extract maximum flavor from dried herbs",
-    "how to identify fake olive oil using simple tests",
-    "what is enzymatic browning and how chefs use it",
-    "how koji mold transforms grains and proteins",
-    "ways to balance umami in plant based cooking",
-    "how to make vegan cheese that melts realistically",
-    "what is the maillard reaction and control variables",
-    "how to preserve herbs using oil infusion safely",
-    "ways to reduce food miles in weekly meal planning",
-    "how to test flour protein content at home",
-    "what is autolyse and its role in sourdough",
-    "how to recreate historical recipes with modern tools",
-    "ways to use leftover coffee grounds in cooking",
-    "how to make gluten free bread with better texture",
-    "what is carryover cooking and when to account for it",
-    "how to calibrate your oven thermometer accurately",
-    "ways to use miso beyond soup for depth of flavor",
-    "how to ferment hot sauce with wild cultures",
-    "what is hydrocolloid science in modernist cuisine",
-    "how to make clear broth using egg white raft",
-    "ways to reduce salt without losing savory notes",
-    "how to age cheese at home in small batches",
-    "what is umami synergy and ingredient pairings",
-
+    "how fermentation changes nutritional profile of soy", "what is nixtamalization and why it matters for corn", "ways to extract maximum flavor from dried herbs", "how to identify fake olive oil using simple tests", "what is enzymatic browning and how chefs use it", "how koji mold transforms grains and proteins", "ways to balance umami in plant based cooking", "how to make vegan cheese that melts realistically", "what is the maillard reaction and control variables", "how to preserve herbs using oil infusion safely", "ways to reduce food miles in weekly meal planning", "how to test flour protein content at home", "what is autolyse and its role in sourdough", "how to recreate historical recipes with modern tools", "ways to use leftover coffee grounds in cooking", "how to make gluten free bread with better texture", "what is carryover cooking and when to account for it", "how to calibrate your oven thermometer accurately", "ways to use miso beyond soup for depth of flavor", "how to ferment hot sauce with wild cultures", "what is hydrocolloid science in modernist cuisine", "how to make clear broth using egg white raft", "ways to reduce salt without losing savory notes", "how to age cheese at home in small batches", "what is umami synergy and ingredient pairings",
     // 🧘 Holistic Health & Integrative Practices (25)
-    "how to use breathwork for vagus nerve stimulation",
-    "what is forest therapy and certified guide criteria",
-    "ways to integrate tai chi principles into desk work",
-    "how to create a personalized circadian lighting plan",
-    "what is thermography and its diagnostic uses",
-    "how to use acupressure points for travel fatigue",
-    "ways to balance gut microbiome with prebiotic foods",
-    "how to interpret heart rate variability for stress",
-    "what is red light therapy and evidence based uses",
-    "how to schedule meals for optimal digestion rhythm",
-    "ways to reduce emf exposure in sleeping areas",
-    "how to use castor oil packs for lymphatic support",
-    "what is coherence training and hrv biofeedback",
-    "how to choose adaptogens based on constitution",
-    "ways to practice earthing safely in cities",
-    "how to design a restorative yoga sequence at home",
-    "what is functional medicine testing and options",
-    "how to use aromatherapy for focus without distraction",
-    "ways to support mitochondrial health daily",
-    "how to create a digital sunset routine for sleep",
-    "what is myofascial release and tools for self care",
-    "how to use contrast therapy for recovery at home",
-    "ways to reduce histamine load in chronic conditions",
-    "how to interpret tongue diagnosis in traditional systems",
-    "what is grounding meditation and beginner scripts"
+    "how to use breathwork for vagus nerve stimulation", "what is forest therapy and certified guide criteria", "ways to integrate tai chi principles into desk work", "how to create a personalized circadian lighting plan", "what is thermography and its diagnostic uses", "how to use acupressure points for travel fatigue", "ways to balance gut microbiome with prebiotic foods", "how to interpret heart rate variability for stress", "what is red light therapy and evidence based uses", "how to schedule meals for optimal digestion rhythm", "ways to reduce emf exposure in sleeping areas", "how to use castor oil packs for lymphatic support", "what is coherence training and hrv biofeedback", "how to choose adaptogens based on constitution", "ways to practice earthing safely in cities", "how to design a restorative yoga sequence at home", "what is functional medicine testing and options", "how to use aromatherapy for focus without distraction", "ways to support mitochondrial health daily", "how to create a digital sunset routine for sleep", "what is myofascial release and tools for self care", "how to use contrast therapy for recovery at home", "ways to reduce histamine load in chronic conditions", "how to interpret tongue diagnosis in traditional systems", "what is grounding meditation and beginner scripts"
   );
 
   const maxSearches = 32;
@@ -1001,7 +234,7 @@
 
   // --- Typing simulation (human-like) ---
   async function simulateTypingInto(input, text) {
-    const mistakeProb = 0.18; // ~18% chance to make 1-2 typos per phrase
+    const mistakeProb = 0.24; // ~24% chance to make 1-2 typos per phrase
     const makeMistake = Math.random() < mistakeProb;
     const chars = text.split('');
     input.focus();
@@ -1090,6 +323,8 @@
   }
 
   // Controls container: badge + start/stop buttons
+  // === UI: Fixed Layout ===
+  // Always-visible: Start | Stop | ⚙️ Settings | (badge last)
   const controls = document.createElement("div");
   controls.style.position = "fixed";
   controls.style.bottom = "20px";
@@ -1100,19 +335,7 @@
   controls.style.zIndex = "9999";
   document.body.appendChild(controls);
 
-  const badge = document.createElement("div");
-  badge.style.background = "#f9f9f9";
-  badge.style.color = "#f25022";
-  badge.style.padding = "8px 14px";
-  badge.style.border = "1px solid #ddd";
-  badge.style.borderRadius = "8px";
-  badge.style.fontSize = "14px";
-  badge.style.fontFamily = "Segoe UI, sans-serif";
-  badge.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-  badge.style.userSelect = "none";
-  badge.style.display = "none"; // hidden by default
-  controls.appendChild(badge);
-
+  // --- Always-visible action buttons (fixed order, never move) ---
   const startButton = document.createElement("button");
   startButton.textContent = "Start";
   startButton.title = "Ctrl+Shift+C";
@@ -1125,7 +348,6 @@
   startButton.style.fontFamily = "Segoe UI, sans-serif";
   startButton.style.fontSize = "13px";
   startButton.style.boxShadow = "0 1px 4px rgba(0,0,0,0.12)";
-  startButton.style.display = state.running ? "none" : "inline-block";
   startButton.addEventListener("click", startAutomation);
   controls.appendChild(startButton);
 
@@ -1141,156 +363,249 @@
   stopButton.style.fontFamily = "Segoe UI, sans-serif";
   stopButton.style.fontSize = "13px";
   stopButton.style.boxShadow = "0 1px 4px rgba(0,0,0,0.12)";
-  stopButton.style.display = state.running ? "inline-block" : "none";
   stopButton.addEventListener("click", stopAutomation);
   controls.appendChild(stopButton);
 
+  // --- Settings toggle ---
+  let settingsExpanded = false;
+  const settingsButton = document.createElement("button");
+  settingsButton.textContent = "⚙️ Settings";
+  settingsButton.title = "Show/hide advanced controls";
+  settingsButton.style.padding = "8px 10px";
+  settingsButton.style.borderRadius = "8px";
+  settingsButton.style.border = "1px solid #ddd";
+  settingsButton.style.background = "#6c757d";
+  settingsButton.style.color = "#fff";
+  settingsButton.style.cursor = "pointer";
+  settingsButton.style.fontFamily = "Segoe UI, sans-serif";
+  settingsButton.style.fontSize = "12px";
+  settingsButton.style.boxShadow = "0 1px 4px rgba(0,0,0,0.12)";
+  settingsButton.addEventListener("click", () => {
+    settingsExpanded = !settingsExpanded;
+    settingsContainer.style.display = settingsExpanded ? "flex" : "none";
+    settingsButton.textContent = settingsExpanded ? "⚙️ Hide Settings" : "⚙️ Show Settings";
+  });
+  controls.appendChild(settingsButton);
+
+  // --- Badge (moved to end) ---
+  const badge = document.createElement("div");
+  badge.style.background = "#f9f9f9";
+  badge.style.color = "#f25022";
+  badge.style.padding = "8px 14px";
+  badge.style.border = "1px solid #ddd";
+  badge.style.borderRadius = "8px";
+  badge.style.fontSize = "14px";
+  badge.style.fontFamily = "Segoe UI, sans-serif";
+  badge.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+  badge.style.userSelect = "none";
+  badge.style.display = "block"; // always visible (shows status only)
+  controls.appendChild(badge);
+
+  // --- Settings container (hidden by default) ---
+  const settingsContainer = document.createElement("div");
+  settingsContainer.style.position = "fixed";
+  settingsContainer.style.bottom = "60px"; // just above main controls
+  settingsContainer.style.left = "20px";
+  settingsContainer.style.display = "none"; // hidden by default
+  settingsContainer.style.alignItems = "center";
+  settingsContainer.style.gap = "6px";
+  settingsContainer.style.zIndex = "9998";
+  settingsContainer.style.background = "#fff";
+  settingsContainer.style.padding = "6px";
+  settingsContainer.style.borderRadius = "8px";
+  settingsContainer.style.border = "1px solid #eee";
+  settingsContainer.style.boxShadow = "0 2px 6px rgba(0,0,0,0.1)";
+  document.body.appendChild(settingsContainer);
+
+  // Now create all secondary buttons and append to settingsContainer
   const resetSeenButton = document.createElement("button");
   resetSeenButton.textContent = "Reset Seen";
   resetSeenButton.title = "Reset seen searches";
-  resetSeenButton.style.padding = "8px 12px";
-  resetSeenButton.style.borderRadius = "8px";
+  resetSeenButton.style.padding = "6px 10px";
+  resetSeenButton.style.borderRadius = "6px";
   resetSeenButton.style.border = "1px solid #ddd";
   resetSeenButton.style.background = "#f0ad4e";
   resetSeenButton.style.color = "#062538";
   resetSeenButton.style.cursor = "pointer";
   resetSeenButton.style.fontFamily = "Segoe UI, sans-serif";
-  resetSeenButton.style.fontSize = "13px";
-  resetSeenButton.style.boxShadow = "0 1px 4px rgba(0,0,0,0.12)";
+  resetSeenButton.style.fontSize = "11px";
+  resetSeenButton.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
   resetSeenButton.addEventListener("click", resetSeen);
-  controls.appendChild(resetSeenButton);
+  settingsContainer.appendChild(resetSeenButton);
 
-  // Daily cap display / edit
   const dailyCapBtn = document.createElement('button');
   dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
   dailyCapBtn.title = 'Click to change daily cap';
-  dailyCapBtn.style.padding = '8px 10px';
-  dailyCapBtn.style.borderRadius = '8px';
+  dailyCapBtn.style.padding = '6px 8px';
+  dailyCapBtn.style.borderRadius = '6px';
   dailyCapBtn.style.border = '1px solid #ddd';
   dailyCapBtn.style.background = '#ffffff';
   dailyCapBtn.style.color = '#333';
   dailyCapBtn.style.cursor = 'pointer';
   dailyCapBtn.style.fontFamily = 'Segoe UI, sans-serif';
-  dailyCapBtn.style.fontSize = '12px';
+  dailyCapBtn.style.fontSize = '11px';
   dailyCapBtn.addEventListener('click', () => {
     const next = parseInt(prompt('Set daily cap (number of searches per day):', CONFIG.dailyCap), 10);
-    if (!isNaN(next) && next > 0) { CONFIG.dailyCap = next; saveConfig(CONFIG); showNotification(`✅ Daily cap set to ${next}`, 2000); dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`; }
+    if (!isNaN(next) && next > 0) {
+      CONFIG.dailyCap = next;
+      saveConfig(CONFIG);
+      showNotification(`✅ Daily cap set to ${next}`, 2000);
+      dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
+    }
   });
-  controls.appendChild(dailyCapBtn);
+  settingsContainer.appendChild(dailyCapBtn);
 
-  // Browsing mode toggle (opt-in)
   const browseToggle = document.createElement('button');
   browseToggle.textContent = CONFIG.browsingMode ? 'Browse: ON' : 'Browse: OFF';
   browseToggle.title = 'Toggle browsing mode (opt-in)';
-  browseToggle.style.padding = '8px 10px';
-  browseToggle.style.borderRadius = '8px';
+  browseToggle.style.padding = '6px 8px';
+  browseToggle.style.borderRadius = '6px';
   browseToggle.style.border = '1px solid #ddd';
   browseToggle.style.background = CONFIG.browsingMode ? '#2b6cb0' : '#fff';
   browseToggle.style.color = CONFIG.browsingMode ? '#fff' : '#333';
   browseToggle.style.cursor = 'pointer';
   browseToggle.style.fontFamily = 'Segoe UI, sans-serif';
-  browseToggle.style.fontSize = '12px';
+  browseToggle.style.fontSize = '11px';
   browseToggle.addEventListener('click', () => {
     CONFIG.browsingMode = !CONFIG.browsingMode; saveConfig(CONFIG);
     browseToggle.textContent = CONFIG.browsingMode ? 'Browse: ON' : 'Browse: OFF';
     browseToggle.style.background = CONFIG.browsingMode ? '#2b6cb0' : '#fff';
     browseToggle.style.color = CONFIG.browsingMode ? '#fff' : '#333';
-    showNotification(CONFIG.browsingMode ? '🔎 Browsing mode enabled (opt-in)' : '🔒 Browsing mode disabled', 2500);
+    showNotification(CONFIG.browsingMode ? '🔄 Browsing mode enabled (opt-in)' : '🔒 Browsing mode disabled', 2500);
   });
-  controls.appendChild(browseToggle);
+  settingsContainer.appendChild(browseToggle);
 
-  // Log controls
   const downloadLogBtn = document.createElement('button');
   downloadLogBtn.textContent = 'Download Log';
-  downloadLogBtn.style.padding = '8px 10px';
-  downloadLogBtn.style.borderRadius = '8px';
+  downloadLogBtn.style.padding = '6px 8px';
+  downloadLogBtn.style.borderRadius = '6px';
   downloadLogBtn.style.border = '1px solid #ddd';
   downloadLogBtn.style.background = '#6c757d';
   downloadLogBtn.style.color = '#fff';
   downloadLogBtn.style.cursor = 'pointer';
   downloadLogBtn.style.fontFamily = 'Segoe UI, sans-serif';
-  downloadLogBtn.style.fontSize = '12px';
+  downloadLogBtn.style.fontSize = '11px';
   downloadLogBtn.addEventListener('click', downloadLog);
-  controls.appendChild(downloadLogBtn);
+  settingsContainer.appendChild(downloadLogBtn);
 
   const clearLogBtn = document.createElement('button');
   clearLogBtn.textContent = 'Clear Log';
-  clearLogBtn.style.padding = '8px 10px';
-  clearLogBtn.style.borderRadius = '8px';
+  clearLogBtn.style.padding = '6px 8px';
+  clearLogBtn.style.borderRadius = '6px';
   clearLogBtn.style.border = '1px solid #ddd';
   clearLogBtn.style.background = '#adb5bd';
   clearLogBtn.style.color = '#062538';
   clearLogBtn.style.cursor = 'pointer';
   clearLogBtn.style.fontFamily = 'Segoe UI, sans-serif';
-  clearLogBtn.style.fontSize = '12px';
+  clearLogBtn.style.fontSize = '11px';
   clearLogBtn.addEventListener('click', () => { if (confirm('Clear event log?')) clearLog(); });
-  controls.appendChild(clearLogBtn);
+  settingsContainer.appendChild(clearLogBtn);
 
-  // Require manual start toggle
   const requireStartBtn = document.createElement('button');
-  requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual Start: ON' : 'Manual Start: OFF';
-  requireStartBtn.style.padding = '8px 10px'; requireStartBtn.style.borderRadius = '8px';
-  requireStartBtn.style.border = '1px solid #ddd'; requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff';
-  requireStartBtn.style.color = CONFIG.requireManualStart ? '#fff' : '#333'; requireStartBtn.style.cursor = 'pointer';
-  requireStartBtn.style.fontSize = '12px'; requireStartBtn.addEventListener('click', () => { CONFIG.requireManualStart = !CONFIG.requireManualStart; saveConfig(CONFIG); requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual Start: ON' : 'Manual Start: OFF'; requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff'; showNotification('Manual start: ' + (CONFIG.requireManualStart ? 'enabled' : 'disabled'), 2000); });
-  controls.appendChild(requireStartBtn);
+  requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual: ON' : 'Manual: OFF';
+  requireStartBtn.style.padding = '6px 8px';
+  requireStartBtn.style.borderRadius = '6px';
+  requireStartBtn.style.border = '1px solid #ddd';
+  requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff';
+  requireStartBtn.style.color = CONFIG.requireManualStart ? '#fff' : '#333';
+  requireStartBtn.style.cursor = 'pointer';
+  requireStartBtn.style.fontSize = '11px';
+  requireStartBtn.addEventListener('click', () => {
+    CONFIG.requireManualStart = !CONFIG.requireManualStart;
+    saveConfig(CONFIG);
+    requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual: ON' : 'Manual: OFF';
+    requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff';
+    showNotification('Manual start: ' + (CONFIG.requireManualStart ? 'enabled' : 'disabled'), 2000);
+  });
+  settingsContainer.appendChild(requireStartBtn);
 
-  // Spread mode toggle (encourages spacing across day)
   const spreadBtn = document.createElement('button');
   spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF';
-  spreadBtn.style.padding = '8px 10px'; spreadBtn.style.borderRadius = '8px'; spreadBtn.style.border = '1px solid #ddd';
-  spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff'; spreadBtn.style.color = CONFIG.spreadMode ? '#fff' : '#333'; spreadBtn.style.cursor = 'pointer'; spreadBtn.style.fontSize = '12px';
-  spreadBtn.addEventListener('click', () => { CONFIG.spreadMode = !CONFIG.spreadMode; saveConfig(CONFIG); spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF'; spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff'; showNotification('Spread mode: ' + (CONFIG.spreadMode ? 'enabled' : 'disabled'), 2000); });
-  controls.appendChild(spreadBtn);
+  spreadBtn.style.padding = '6px 8px';
+  spreadBtn.style.borderRadius = '6px';
+  spreadBtn.style.border = '1px solid #ddd';
+  spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff';
+  spreadBtn.style.color = CONFIG.spreadMode ? '#fff' : '#333';
+  spreadBtn.style.cursor = 'pointer';
+  spreadBtn.style.fontSize = '11px';
+  spreadBtn.addEventListener('click', () => {
+    CONFIG.spreadMode = !CONFIG.spreadMode;
+    saveConfig(CONFIG);
+    spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF';
+    spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff';
+    showNotification('Spread mode: ' + (CONFIG.spreadMode ? 'enabled' : 'disabled'), 2000);
+  });
+  settingsContainer.appendChild(spreadBtn);
 
-  // Hourly cap edit
   const hourlyBtn = document.createElement('button');
   hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
-  hourlyBtn.style.padding = '8px 10px'; hourlyBtn.style.borderRadius = '8px'; hourlyBtn.style.border = '1px solid #ddd'; hourlyBtn.style.background = '#fff'; hourlyBtn.style.color = '#333'; hourlyBtn.style.cursor = 'pointer'; hourlyBtn.style.fontSize = '12px';
+  hourlyBtn.style.padding = '6px 8px';
+  hourlyBtn.style.borderRadius = '6px';
+  hourlyBtn.style.border = '1px solid #ddd';
+  hourlyBtn.style.background = '#fff';
+  hourlyBtn.style.color = '#333';
+  hourlyBtn.style.cursor = 'pointer';
+  hourlyBtn.style.fontSize = '11px';
   hourlyBtn.addEventListener('click', () => {
     const next = parseInt(prompt('Set max searches per hour:', CONFIG.maxPerHour), 10);
-    if (!isNaN(next) && next > 0) { CONFIG.maxPerHour = next; saveConfig(CONFIG); showNotification(`✅ Hourly cap set to ${next}`, 2000); hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`; }
+    if (!isNaN(next) && next > 0) {
+      CONFIG.maxPerHour = next;
+      saveConfig(CONFIG);
+      showNotification(`✅ Hourly cap set to ${next}`, 2000);
+      hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
+    }
   });
-  controls.appendChild(hourlyBtn);
+  settingsContainer.appendChild(hourlyBtn);
 
-  // Reset all data button
   const resetAllBtn = document.createElement('button');
-  resetAllBtn.textContent = 'Reset All Data';
-  resetAllBtn.style.padding = '8px 10px'; resetAllBtn.style.borderRadius = '8px'; resetAllBtn.style.border = '1px solid #ddd'; resetAllBtn.style.background = '#dc3545'; resetAllBtn.style.color = '#fff'; resetAllBtn.style.cursor = 'pointer'; resetAllBtn.style.fontSize = '12px';
+  resetAllBtn.textContent = 'Reset All';
+  resetAllBtn.style.padding = '6px 8px';
+  resetAllBtn.style.borderRadius = '6px';
+  resetAllBtn.style.border = '1px solid #ddd';
+  resetAllBtn.style.background = '#dc3545';
+  resetAllBtn.style.color = '#fff';
+  resetAllBtn.style.cursor = 'pointer';
+  resetAllBtn.style.fontSize = '11px';
   resetAllBtn.addEventListener('click', () => {
-    if (!confirm('This will clear seen list, logs, counters and config. Continue?')) return;
-    localStorage.removeItem('bingAutoSeen'); localStorage.removeItem('bingAutoLog'); localStorage.removeItem('bingAutoDaily'); localStorage.removeItem('bingAutoHourly'); localStorage.removeItem('bingAutoConfig'); localStorage.removeItem('bingAutoState');
-    seenSet = new Set(); eventLog = []; DAILY = loadDaily(); HOURLY = loadHourly(); CONFIG = loadConfig(); showNotification('All data cleared. Reload the page.', 3000); logEvent('reset', 'user-reset-all');
+    if (!confirm('Clear seen list, logs, counters, and config?')) return;
+    localStorage.removeItem('bingAutoSeen');
+    localStorage.removeItem('bingAutoLog');
+    localStorage.removeItem('bingAutoDaily');
+    localStorage.removeItem('bingAutoHourly');
+    localStorage.removeItem('bingAutoConfig');
+    localStorage.removeItem('bingAutoState');
+    seenSet = new Set();
+    eventLog = [];
+    DAILY = loadDaily();
+    HOURLY = loadHourly();
+    CONFIG = loadConfig();
+    showNotification('🧹 All data cleared. Reload to apply.', 3000);
+    logEvent('reset', 'user-reset-all');
+    // Update buttons
+    dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
+    hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
+    browseToggle.textContent = CONFIG.browsingMode ? 'Browse: ON' : 'Browse: OFF';
+    requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual: ON' : 'Manual: OFF';
+    spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF';
   });
-  controls.appendChild(resetAllBtn);
+  settingsContainer.appendChild(resetAllBtn);
 
   function updateBadge() {
-    // update button enabled state
-    // show only the correct button
-    startButton.style.display = state.running ? "none" : "inline-block";
-    stopButton.style.display = state.running ? "inline-block" : "none";
-
-    // update enabled/disabled (for accessibility) and visuals
+    // Always keep Start/Stop visible — just enable/disable
     startButton.disabled = state.running;
     stopButton.disabled = !state.running;
-    startButton.style.opacity = startButton.disabled ? "0.6" : "1";
-    stopButton.style.opacity = stopButton.disabled ? "0.6" : "1";
+    startButton.style.opacity = startButton.disabled ? "0.5" : "1";
+    stopButton.style.opacity = stopButton.disabled ? "0.5" : "1";
+    badge.textContent = `✅ Ready | Waiting to start`;
 
     if (!state.running) {
-      badge.style.display = "none"; // hide if stopped
-      // show available pool size when stopped
       const remaining = words.length - seenSet.size;
-      badge.textContent = `⏸️ Stopped | Remaining phrases: ${remaining}`;
-      badge.style.display = "block";
-      // when stopped show Start button, hide Stop
-      startButton.style.display = "inline-block";
-      stopButton.style.display = "none";
+      badge.textContent = `⏸️ Stopped | Remaining: ${remaining}`;
       return;
     }
 
-    badge.style.display = "block";
     let progress = `${state.count}/${maxSearches}`;
-    let timerText = state.running && nextDelay > 0 ? ` | ⏳ ${nextDelay}s` : "";
+    let timerText = nextDelay > 0 ? ` | ⏳ ${nextDelay}s` : "";
     badge.textContent = `▶️ Running | ${progress}${timerText}`;
   }
 
