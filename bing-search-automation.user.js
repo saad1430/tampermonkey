@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bing Random Search Automation
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.4.1
 // @description  Automates Bing searches with human-like delays. Keybinds + notifications + clean Bing-styled status badge included.
 // @author       Saad1430
 // @match        https://www.bing.com/*
@@ -147,11 +147,9 @@
     "best ways to signal for help in the wild",
     "how to prevent blisters on long hikes",
     "what permits are typically needed for backcountry camping",
-    "how to choose a reliable headlamp for overnight trips"
-  ];
+    "how to choose a reliable headlamp for overnight trips",
 
-  // --- Extra phrases (100) ---
-  words.push(
+    // --- Extra phrases (100) ---
     "how to plan a cross country road trip",
     "best apps to track personal finance",
     "how to grow herbs indoors year round",
@@ -257,6 +255,580 @@
     "how to run effective one on one meetings",
     "tips for decorating small apartments",
     "how to pick the perfect houseplant for beginners"
+  ];
+
+  // --- Extra phrases (Grok Generated - 08-12-25) ---
+  words.push(
+    "how to organize a garage sale effectively",
+    "best virtual reality headsets for beginners",
+    "what causes seasonal allergies and remedies",
+    "tips for starting a vegetable garden in spring",
+    "how to repair a leaky faucet at home",
+    "top rated noise cancelling headphones 2025",
+    "how to create digital art with free tools",
+    "benefits of practicing tai chi daily",
+    "how to select fresh seafood at the market",
+    "famous myths and legends from ancient greece",
+    "how to troubleshoot common printer issues",
+    "best electric cars for long distance travel",
+    "what is sustainable fashion and why it matters",
+    "easy crafts for kids using recycled materials",
+    "how to improve your credit score quickly",
+    "top destinations for winter skiing holidays",
+    "how to make vegan desserts without eggs",
+    "best wireless earbuds for workouts",
+    "what are the health benefits of yoga",
+    "how to set up a home recording studio",
+    "famous explorers and their discoveries",
+    "tips for packing light for international trips",
+    "how to brew beer at home for beginners",
+    "best smart home devices for security",
+    "what is cryptocurrency mining explained",
+    "how to draw realistic portraits step by step",
+    "top beaches for family vacations in asia",
+    "how to fix common smartphone battery problems",
+    "benefits of intermittent fasting for weight loss",
+    "how to start a blog and monetize it",
+    "famous composers from the classical era",
+    "tips for choosing the right pet for your family",
+    "how to make natural cleaning products",
+    "best fitness trackers for monitoring health",
+    "what is the history of the olympic games",
+    "how to learn sign language basics",
+    "top national parks in north america",
+    "how to upgrade your computer's ram",
+    "benefits of reading fiction books regularly",
+    "how to prepare for a job interview online",
+    "famous artists and their painting styles",
+    "tips for maintaining houseplants in low light",
+    "how to cook authentic mexican tacos",
+    "best drones for aerial photography",
+    "what is virtual reality therapy used for",
+    "how to build a treehouse for kids",
+    "top cities for street food around the world",
+    "how to reset forgotten passwords securely",
+    "benefits of walking barefoot on grass",
+    "how to create a family budget plan",
+    "famous battles in world war ii",
+    "tips for improving handwriting for adults",
+    "how to make soap at home naturally",
+    "best tablets for reading ebooks",
+    "what is the science behind rainbows",
+    "how to train for a 5k run as a beginner",
+    "top islands for honeymoon getaways",
+    "how to install solar panels on your roof",
+    "benefits of using essential oils daily",
+    "how to write poetry for beginners",
+    "famous inventions by women in history",
+    "tips for dealing with procrastination",
+    "how to bake gluten free bread",
+    "best smartwatches for android users",
+    "what is dark matter in the universe",
+    "how to start freelancing on graphic design",
+    "top museums for modern art in europe",
+    "how to fix a flat bicycle tire",
+    "benefits of journaling for mental health",
+    "how to plan a surprise birthday party",
+    "famous quotes from shakespeare plays",
+    "tips for safe online shopping practices",
+    "how to grow mushrooms at home",
+    "best cameras for vlogging beginners",
+    "what are black holes and how they form",
+    "how to learn chess openings effectively",
+    "top adventure sports destinations worldwide",
+    "how to troubleshoot wifi connection problems",
+    "benefits of eating organic fruits and veggies",
+    "how to create a vision board for goals",
+    "famous philosophers and their ideas",
+    "tips for organizing digital files efficiently",
+    "how to make fermented foods like kimchi",
+    "best monitors for graphic designers",
+    "what is the role of bees in ecosystems",
+    "how to prepare for natural disasters",
+    "top cultural festivals around the globe",
+    "how to replace a car battery safely",
+    "benefits of practicing gratitude daily",
+    "how to design logos using free software",
+    "famous novels adapted into tv series",
+    "tips for better time management at work",
+    "how to cook indian curry from scratch",
+    "best routers for home internet speed",
+    "what is climate change impact on oceans",
+    "how to start a book club with friends",
+    "top wildlife safaris in africa",
+    "how to clean jewelry at home",
+    "benefits of strength training for women",
+    "how to build a raised garden bed",
+    "famous scientists who changed the world",
+    "tips for reducing stress at work",
+    "how to make candles at home easily",
+    "best speakers for home theater setup",
+    "what is the history of chocolate",
+    "how to learn ballroom dancing steps",
+    "top romantic getaways in europe",
+    "how to secure your email account",
+    "benefits of cold showers for health",
+    "how to create a workout playlist",
+    "famous landmarks in south america",
+    "tips for eco friendly living habits",
+    "how to grill perfect steaks outdoors",
+    "best laptops for video editing 2025",
+    "what is the origin of halloween",
+    "how to meditate for focus and clarity",
+    "top ski resorts in the alps",
+    "how to change a car's oil filter",
+    "benefits of herbal teas for sleep",
+    "how to write a business plan template",
+    "famous musicians from the jazz era",
+    "tips for packing for a cruise vacation",
+    "how to make yogurt at home",
+    "best headphones for music production",
+    "what are solar eclipses and safety tips",
+    "how to improve public speaking confidence",
+    "top vineyards for wine tasting tours",
+    "how to backup computer files securely",
+    "benefits of cycling for cardiovascular health",
+    "how to plan a backyard wedding",
+    "famous poems about nature and life",
+    "tips for choosing sustainable clothing",
+    "how to prepare sushi rolls at home",
+    "best projectors for home movies",
+    "what is the life cycle of stars",
+    "how to start investing in real estate",
+    "top hot springs destinations worldwide",
+    "how to fix common plumbing issues",
+    "benefits of aromatherapy for relaxation",
+    "how to create custom greeting cards",
+    "famous historical figures in asia",
+    "tips for better email communication",
+    "how to grow orchids indoors successfully",
+    "best fitness apps for home workouts",
+    "what is the theory of evolution simplified",
+    "how to learn photography composition rules",
+    "top desert safari experiences in dubai",
+    "how to install antivirus software properly",
+    "benefits of laughter yoga sessions",
+    "how to organize a charity fundraiser",
+    "famous bridges around the world",
+    "tips for healthy snacking options",
+    "how to make pasta sauce from tomatoes",
+    "best smart thermostats for energy savings",
+    "what are comets and meteor showers",
+    "how to train a cat to use litter box",
+    "top ancient ruins to visit in mexico",
+    "how to troubleshoot laptop overheating",
+    "benefits of deep breathing exercises",
+    "how to build a birdhouse diy project",
+    "famous inventions from the renaissance",
+    "tips for virtual meeting etiquette",
+    "how to cook thai stir fry dishes",
+    "best external hard drives for storage",
+    "what is the human genome project",
+    "how to start a meditation journal",
+    "top coral reefs for snorkeling",
+    "how to replace screen on a phone",
+    "benefits of probiotics for gut health",
+    "how to plan a group hiking trip",
+    "famous quotes on success and failure",
+    "tips for reducing plastic in kitchens",
+    "how to bake sourdough pizza dough",
+    "best webcams for video calls",
+    "what is string theory in physics",
+    "how to learn basic sewing skills",
+    "top flower festivals in the netherlands",
+    "how to optimize smartphone storage",
+    "benefits of forest bathing therapy",
+    "how to create a home office setup",
+    "famous volcanoes and their eruptions",
+    "tips for mindful parenting techniques",
+    "how to make herbal infusions",
+    "best action cameras for adventures",
+    "what are galaxies and their types",
+    "how to improve running endurance",
+    "top eco lodges for sustainable travel",
+    "how to clean a microwave effectively",
+    "benefits of omega 3 fatty acids",
+    "how to write effective cover letters",
+    "famous operas and their composers",
+    "tips for budget travel in europe",
+    "how to grow strawberries in pots",
+    "best power banks for charging devices",
+    "what is the big bang theory explained",
+    "how to start a vegetable juicing routine",
+    "top canyons for hiking in usa",
+    "how to fix blurry photos in editing",
+    "benefits of acupuncture for pain relief",
+    "how to organize closet space efficiently",
+    "famous rivers and their significance",
+    "tips for learning guitar scales",
+    "how to make fruit jams at home",
+    "best vr games for fitness",
+    "what is relativity theory by einstein",
+    "how to prepare for college entrance exams",
+    "top aurora viewing spots in scandinavia",
+    "how to secure home network from hackers",
+    "benefits of vitamin d supplements",
+    "how to build a compost bin diy",
+    "famous deserts around the world",
+    "tips for effective note taking methods",
+    "how to cook middle eastern falafel",
+    "best bluetooth speakers for outdoors",
+    "what are supernovas and their effects",
+    "how to learn digital marketing basics",
+    "top mountain biking trails in colorado",
+    "how to troubleshoot tv remote issues",
+    "benefits of mindfulness apps for beginners",
+    "how to plan a themed dinner party",
+    "famous islands in the pacific ocean",
+    "tips for improving sleep quality naturally",
+    "how to make cheese at home simply",
+    "best fitness bikes for commuting",
+    "what is the water cycle process",
+    "how to start a podcast on spotify",
+    "top whale watching tours in alaska",
+    "how to clean grout in bathroom tiles",
+    "benefits of turmeric for inflammation",
+    "how to create a linkedin profile",
+    "famous mountains for climbing expeditions",
+    "tips for healthy hair care routines",
+    "how to bake vegan cookies easily",
+    "best gaming mice for precision",
+    "what are asteroids and their orbits",
+    "how to improve vocabulary daily",
+    "top lavender fields in provence france",
+    "how to install home security cameras",
+    "benefits of green smoothies for detox",
+    "how to organize a community cleanup",
+    "famous lakes for boating activities",
+    "tips for starting a fitness challenge",
+    "how to make natural face masks",
+    "best e readers for book lovers",
+    "what is plate tectonics theory",
+    "how to learn basic html coding",
+    "top cherry blossom spots in japan",
+    "how to fix squeaky door hinges",
+    "benefits of pilates for core strength",
+    "how to plan a solo travel adventure",
+    "famous waterfalls in south america",
+    "tips for better posture at desk",
+    "how to cook greek souvlaki skewers",
+    "best portable chargers for travel",
+    "what is photosynthesis in plants",
+    "how to start investing in etfs",
+    "top tulip farms in the netherlands",
+    "how to troubleshoot earbud sound issues",
+    "benefits of chia seeds in diet",
+    "how to build a sandcastle like pro",
+    "famous canyons in the grand canyon area",
+    "tips for creative writing prompts",
+    "how to make iced tea variations",
+    "best mechanical keyboards for typing",
+    "what are pulsars in astronomy",
+    "how to prepare for a hiking marathon",
+    "top autumn foliage spots in new england",
+    "how to clean silverware naturally",
+    "benefits of meditation apps for anxiety",
+    "how to create a personal website"
+  );
+
+  // --- Extra phrases (Qwen Generated - 08-12-25) ---
+  words.push(
+    // 🌍 Global & Cultural (25)
+    "traditional tea ceremonies in japan and their meaning",
+    "how indigenous communities manage land sustainably",
+    "what is ubuntu philosophy and how is it applied",
+    "best ways to respectfully visit sacred sites abroad",
+    "origins of diwali and regional celebration differences",
+    "how to learn sign language basics for travel",
+    "what are geisha roles in modern kyoto",
+    "cultural etiquette tips for visiting temples in southeast asia",
+    "history behind day of the dead in mexico",
+    "how to identify authentic vs mass produced handicrafts",
+    "meaning of henna patterns in different cultures",
+    "traditional music instruments unique to west africa",
+    "what is fika and why it matters in swedish culture",
+    "how to participate in a japanese onsen correctly",
+    "significance of uluru to aboriginal australians",
+    "common gestures to avoid in middle eastern countries",
+    "how to respectfully photograph people in rural communities",
+    "origins of capoeira and its cultural resistance roots",
+    "meaning behind maori tattoos and protocols",
+    "what is hygge and how danes practice it year round",
+    "how to prepare for ramadan as a non muslim visitor",
+    "traditional fermented foods from the caucasus region",
+    "history of berber carpets and symbolism in designs",
+    "how to support fair trade artisans ethically",
+    "what is joik and its place in sami identity",
+
+    // 🔬 Science & Nature Deep Dives (25)
+    "how tardigrades survive extreme space conditions",
+    "what causes bioluminescent waves at night",
+    "how do trees communicate through underground networks",
+    "why some animals can regenerate limbs but humans cant",
+    "how deep sea creatures adapt to zero light environments",
+    "what is the role of fungi in forest ecosystems",
+    "how monarch butterflies navigate thousands of miles",
+    "why do octopuses have three hearts and blue blood",
+    "how coral reefs recover after bleaching events",
+    "what are extremophiles and where do they live",
+    "how do bees perceive color differently than humans",
+    "why do leaves change color in autumn scientifically",
+    "how do migratory birds sense earths magnetic field",
+    "what causes ball lightning and is it real",
+    "how scientists track microplastics in ocean currents",
+    "why some frogs freeze solid in winter and revive",
+    "how do deep ocean vents support life without sunlight",
+    "what is the biological purpose of yawning",
+    "how do chameleons change color at cellular level",
+    "why do some plants bloom only once in decades",
+    "how do bats use echolocation in noisy environments",
+    "what is the science behind aurora borealis colors",
+    "how do ants farm fungi in underground colonies",
+    "why do sloths move so slowly from an energy perspective",
+    "how do scientists date ancient ice cores",
+
+    // 🧠 Mental Wellness & Neurodiversity (25)
+    "how to create a sensory friendly workspace at home",
+    "what is rejection sensitive dysphoria and how to cope",
+    "ways to support autistic adults in social settings",
+    "how grounding techniques differ for anxiety vs panic attacks",
+    "what is interoceptive awareness and why it matters",
+    "how to set boundaries without guilt in relationships",
+    "best non verbal communication tools for non speaking individuals",
+    "how to recognize emotional burnout before it peaks",
+    "what is polyvagal theory and practical applications",
+    "ways to build distress tolerance for chronic illness",
+    "how to practice self compassion after failure",
+    "what is neuroaffirming language and examples",
+    "how to design a calming corner for emotional regulation",
+    "ways to reduce decision fatigue in daily life",
+    "what is somatic experiencing and who benefits",
+    "how to identify toxic positivity in conversations",
+    "best journaling prompts for identity exploration",
+    "how to support someone with misophonia daily",
+    "what is executive dysfunction and actionable strategies",
+    "ways to co regulate emotions with children",
+    "how to create a personal emotional first aid kit",
+    "what is inner child work and how to start",
+    "how to navigate grief anniversaries mindfully",
+    "ways to reduce shame spirals using cognitive tools",
+    "what is radical acceptance in dbt and real life use",
+
+    // 🛠️ Niche DIY & Maker Projects (25)
+    "how to build a passive solar dehydrator from scrap wood",
+    "diy natural dye techniques using kitchen waste",
+    "how to make reusable beeswax food wraps step by step",
+    "build a rainwater catchment system for balcony gardening",
+    "how to upcycle old sweaters into warm mittens",
+    "diy clay soil moisture sensor with arduino nano",
+    "how to create a vertical pallet herb wall indoors",
+    "build a silent mechanical keyboard from kits",
+    "how to make non toxic wood polish with citrus peels",
+    "diy solar phone charger using recycled panels",
+    "how to repurpose wine corks into bulletin boards",
+    "build a compact compost tumbler from plastic drums",
+    "how to craft leather journal covers without stitching",
+    "diy acoustic panels using fabric and insulation",
+    "how to make seed paper embedded with wildflowers",
+    "build a foldable camping stool from bamboo",
+    "how to turn old maps into waterproof book covers",
+    "diy magnetic knife strip from reclaimed wood",
+    "how to create a cork yoga block at home",
+    "build a minimalist floating shelf with hidden brackets",
+    "how to make herbal infused vinegar cleaners",
+    "diy plant propagation station from glass jars",
+    "how to craft a macrame plant hanger with recycled yarn",
+    "build a small batch sourdough starter jar holder",
+    "how to turn vintage tins into travel sewing kits",
+
+    // 💻 Emerging Tech & Digital Ethics (25)
+    "how decentralized identity works without big tech",
+    "what is differential privacy and how apple uses it",
+    "how to audit an ai models bias before deployment",
+    "what are zk proofs and their role in web3 privacy",
+    "how to detect deepfake audio in voice messages",
+    "what is federated learning and real world use cases",
+    "how digital twins simulate cities for climate planning",
+    "what are algorithmic impact assessments and who does them",
+    "how to verify provenance of digital art on blockchain",
+    "what is homomorphic encryption and its limitations",
+    "how satellite internet constellations affect astronomy",
+    "what are ethical guidelines for generative ai in journalism",
+    "how to check if your data is in a training dataset",
+    "what is edge ai and why it matters for rural areas",
+    "how open source models differ in transparency from closed ones",
+    "what are data cooperatives and how they empower users",
+    "how to opt out of ai training in major platforms",
+    "what is neuromorphic computing and current prototypes",
+    "how ai is used in detecting illegal fishing from space",
+    "what are model cards and why developers should publish them",
+    "how to interpret ai confidence scores responsibly",
+    "what is synthetic data and when it replaces real data",
+    "how digital detox apps respect privacy while helping",
+    "what are right to repair laws and global status",
+    "how to identify greenwashing in tech sustainability reports",
+
+    // 🌱 Regenerative Living & Sustainability (25)
+    "how to create a food forest in a suburban backyard",
+    "what is mycoremediation and how mushrooms clean soil",
+    "how to build a hugelkultur bed for water retention",
+    "ways to reduce textile waste by mending creatively",
+    "how to start a community seed library legally",
+    "what is regenerative grazing and how it reverses desertification",
+    "how to compost human waste safely with composting toilets",
+    "ways to convert lawns into native pollinator habitats",
+    "how to make natural pest repellent with companion planting",
+    "what is circular fashion and how to participate",
+    "how to calculate your personal water footprint accurately",
+    "ways to retrofit old homes for passive cooling",
+    "how to support indigenous led conservation efforts",
+    "what is solarpunk and its practical design principles",
+    "how to organize a repair cafe in your neighborhood",
+    "ways to reduce pharmaceutical waste in households",
+    "how to start a neighborhood tool lending library",
+    "what is biomimicry in architecture and real examples",
+    "how to make natural dyes last longer on fabrics",
+    "ways to advocate for plastic free aisles in supermarkets",
+    "how to assess greenwashing in eco product labels",
+    "what is doughnut economics and city applications",
+    "how to create a zero waste wedding without compromise",
+    "ways to reduce emissions from digital activities",
+    "how to support carbon insetting vs offsetting projects",
+
+    // 📚 Learning & Unschooling Approaches (25)
+    "how unschooling families document learning for legality",
+    "what is strewing and how to do it effectively",
+    "ways to nurture curiosity in teens without curriculum",
+    "how to use video games as historical learning tools",
+    "what is interest led learning and long term outcomes",
+    "how to facilitate nature journaling for all ages",
+    "ways to integrate math into daily life unconsciously",
+    "how to create a learning rich environment at home",
+    "what is deschooling and how long it typically takes",
+    "how to support neurodivergent learners in self direction",
+    "ways to use libraries as hubs for project based learning",
+    "how to evaluate open educational resources critically",
+    "what is connected learning and examples in practice",
+    "how to mentor youth in passion projects without directing",
+    "ways to foster critical media literacy from childhood",
+    "how to use podcasts as springboards for deep inquiry",
+    "what is place based education and community benefits",
+    "how to design personal learning dashboards for teens",
+    "ways to support multilingual development at home",
+    "how to turn travel into immersive learning experiences",
+    "what is slow education and its contrast to standardized testing",
+    "how to use citizen science projects for real contribution",
+    "ways to assess learning without grades or tests",
+    "how to create intergenerational learning circles",
+    "what is autodidactism and tools for lifelong self education",
+
+    // 🎨 Creative Expression & Art Therapy (25)
+    "how to use zentangle for anxiety reduction",
+    "what is intuitive painting and how to begin without fear",
+    "ways to create art with natural materials sustainably",
+    "how to journal with collage for emotional processing",
+    "what is bibliotherapy and how to apply it personally",
+    "how to use clay work for somatic trauma release",
+    "ways to explore identity through self portrait variations",
+    "how to create a visual mood board for life transitions",
+    "what is process art and why outcome doesnt matter",
+    "how to use sound baths as creative inspiration",
+    "ways to integrate movement and mark making",
+    "how to make altered books for personal storytelling",
+    "what is eco printing and how to do it at home",
+    "how to use photography as mindfulness practice",
+    "ways to create art with voice recordings and transcripts",
+    "how to build a personal symbolism dictionary",
+    "what is embodied drawing and guided exercises",
+    "how to use poetry prompts for grief expression",
+    "ways to make collaborative art with strangers online",
+    "how to create a tactile memory box for nostalgia",
+    "what is art journaling and starter prompts",
+    "how to use color psychology in daily creative choices",
+    "ways to turn field notes into mixed media pieces",
+    "how to practice daily sketch noting for retention",
+    "what is asemic writing and how to experiment",
+
+    // 🥾 Adventure & Micro-Outdoors (25)
+    "how to plan a safe urban foraging walk in your city",
+    "what to pack for a spontaneous overnight bikepacking trip",
+    "ways to practice forest bathing without forests nearby",
+    "how to identify bird calls using free apps accurately",
+    "what is geocaching and beginner tips for families",
+    "how to build a tiny floating raft for calm waters",
+    "ways to sleep under stars in light polluted areas",
+    "how to navigate using stars in northern hemisphere",
+    "what is plogging and how to start a local group",
+    "how to create a backyard wildlife camera trap",
+    "ways to hike silently to observe more wildlife",
+    "how to make a natural insect repellent for ticks",
+    "what is shinrin yoku and measurable health benefits",
+    "how to identify edible weeds in sidewalk cracks",
+    "ways to practice cold water immersion safely at home",
+    "how to build a debris shelter in under 30 minutes",
+    "what is peak bagging and ethical considerations",
+    "how to photograph dew drops on spiderwebs at dawn",
+    "ways to turn lunch breaks into micro adventures",
+    "how to recognize animal tracks in mud and snow",
+    "what is solastalgia and connection to place loss",
+    "how to prepare for a solo day hike with minimal gear",
+    "ways to explore your neighborhood like a tourist",
+    "how to make a solar oven from a pizza box",
+    "what is biophilia and designing spaces that nurture it",
+
+    // 🍽️ Food Science & Culinary Heritage (25)
+    "how fermentation changes nutritional profile of soy",
+    "what is nixtamalization and why it matters for corn",
+    "ways to extract maximum flavor from dried herbs",
+    "how to identify fake olive oil using simple tests",
+    "what is enzymatic browning and how chefs use it",
+    "how koji mold transforms grains and proteins",
+    "ways to balance umami in plant based cooking",
+    "how to make vegan cheese that melts realistically",
+    "what is the maillard reaction and control variables",
+    "how to preserve herbs using oil infusion safely",
+    "ways to reduce food miles in weekly meal planning",
+    "how to test flour protein content at home",
+    "what is autolyse and its role in sourdough",
+    "how to recreate historical recipes with modern tools",
+    "ways to use leftover coffee grounds in cooking",
+    "how to make gluten free bread with better texture",
+    "what is carryover cooking and when to account for it",
+    "how to calibrate your oven thermometer accurately",
+    "ways to use miso beyond soup for depth of flavor",
+    "how to ferment hot sauce with wild cultures",
+    "what is hydrocolloid science in modernist cuisine",
+    "how to make clear broth using egg white raft",
+    "ways to reduce salt without losing savory notes",
+    "how to age cheese at home in small batches",
+    "what is umami synergy and ingredient pairings",
+
+    // 🧘 Holistic Health & Integrative Practices (25)
+    "how to use breathwork for vagus nerve stimulation",
+    "what is forest therapy and certified guide criteria",
+    "ways to integrate tai chi principles into desk work",
+    "how to create a personalized circadian lighting plan",
+    "what is thermography and its diagnostic uses",
+    "how to use acupressure points for travel fatigue",
+    "ways to balance gut microbiome with prebiotic foods",
+    "how to interpret heart rate variability for stress",
+    "what is red light therapy and evidence based uses",
+    "how to schedule meals for optimal digestion rhythm",
+    "ways to reduce emf exposure in sleeping areas",
+    "how to use castor oil packs for lymphatic support",
+    "what is coherence training and hrv biofeedback",
+    "how to choose adaptogens based on constitution",
+    "ways to practice earthing safely in cities",
+    "how to design a restorative yoga sequence at home",
+    "what is functional medicine testing and options",
+    "how to use aromatherapy for focus without distraction",
+    "ways to support mitochondrial health daily",
+    "how to create a digital sunset routine for sleep",
+    "what is myofascial release and tools for self care",
+    "how to use contrast therapy for recovery at home",
+    "ways to reduce histamine load in chronic conditions",
+    "how to interpret tongue diagnosis in traditional systems",
+    "what is grounding meditation and beginner scripts"
   );
 
   const maxSearches = 32;
@@ -343,7 +915,7 @@
     } catch (e) { return new Set(); }
   }
   function saveSeen() {
-    try { localStorage.setItem('bingAutoSeen', JSON.stringify(Array.from(seenSet))); } catch (e) {}
+    try { localStorage.setItem('bingAutoSeen', JSON.stringify(Array.from(seenSet))); } catch (e) { }
   }
   function resetSeen() {
     seenSet = new Set();
@@ -359,7 +931,7 @@
   function loadConfig() {
     try { return JSON.parse(localStorage.getItem('bingAutoConfig') || '{}') || {}; } catch { return {}; }
   }
-  function saveConfig(cfg) { try { localStorage.setItem('bingAutoConfig', JSON.stringify(cfg)); } catch (e) {} }
+  function saveConfig(cfg) { try { localStorage.setItem('bingAutoConfig', JSON.stringify(cfg)); } catch (e) { } }
   let CONFIG = loadConfig();
   if (typeof CONFIG.dailyCap !== 'number') CONFIG.dailyCap = DEFAULT_DAILY_CAP;
   if (typeof CONFIG.browsingMode !== 'boolean') CONFIG.browsingMode = false;
@@ -375,12 +947,12 @@
   function loadDaily() {
     try {
       const raw = JSON.parse(localStorage.getItem('bingAutoDaily') || '{}');
-      const today = new Date().toISOString().slice(0,10);
+      const today = new Date().toISOString().slice(0, 10);
       if (raw.date !== today) return { date: today, count: 0 };
       return raw;
-    } catch { return { date: new Date().toISOString().slice(0,10), count: 0 }; }
+    } catch { return { date: new Date().toISOString().slice(0, 10), count: 0 }; }
   }
-  function saveDaily(d) { try { localStorage.setItem('bingAutoDaily', JSON.stringify(d)); } catch (e) {} }
+  function saveDaily(d) { try { localStorage.setItem('bingAutoDaily', JSON.stringify(d)); } catch (e) { } }
   let DAILY = loadDaily();
   function incrementDaily() { DAILY.count++; saveDaily(DAILY); }
 
@@ -393,14 +965,14 @@
       return raw;
     } catch { return { hour: Math.floor(Date.now() / 3600000), count: 0 }; }
   }
-  function saveHourly(h) { try { localStorage.setItem('bingAutoHourly', JSON.stringify(h)); } catch (e) {} }
+  function saveHourly(h) { try { localStorage.setItem('bingAutoHourly', JSON.stringify(h)); } catch (e) { } }
   let HOURLY = loadHourly();
   function incrementHourly() { const currentHour = Math.floor(Date.now() / 3600000); if (HOURLY.hour !== currentHour) { HOURLY = { hour: currentHour, count: 1 }; } else { HOURLY.count++; } saveHourly(HOURLY); }
 
   // Simple event log (capped)
   const LOG_MAX = 300;
   function loadLog() { try { return JSON.parse(localStorage.getItem('bingAutoLog') || '[]'); } catch { return []; } }
-  function saveLog(arr) { try { localStorage.setItem('bingAutoLog', JSON.stringify(arr.slice(-LOG_MAX))); } catch {} }
+  function saveLog(arr) { try { localStorage.setItem('bingAutoLog', JSON.stringify(arr.slice(-LOG_MAX))); } catch { } }
   let eventLog = loadLog();
   function logEvent(type, message) {
     const entry = { t: new Date().toISOString(), type: type, message: message };
@@ -412,7 +984,7 @@
     const blob = new Blob([JSON.stringify(eventLog, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `bing-auto-log-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+    a.href = url; a.download = `bing-auto-log-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function clearLog() { eventLog = []; saveLog(eventLog); showNotification('🧹 Log cleared.', 2000); }
@@ -440,7 +1012,7 @@
     let mistakes = [];
     if (makeMistake) {
       const count = Math.random() < 0.6 ? 1 : 2;
-      for (let i=0;i<count;i++) mistakes.push(Math.max(0, Math.floor(Math.random() * Math.max(1, chars.length-2))));
+      for (let i = 0; i < count; i++) mistakes.push(Math.max(0, Math.floor(Math.random() * Math.max(1, chars.length - 2))));
       mistakes = Array.from(new Set(mistakes));
     }
 
@@ -451,7 +1023,7 @@
 
       // if this position is a mistake, type a wrong character first
       if (mistakes.includes(i)) {
-        const wrong = String.fromCharCode(97 + Math.floor(Math.random()*26));
+        const wrong = String.fromCharCode(97 + Math.floor(Math.random() * 26));
         input.value += wrong;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise(r => setTimeout(r, randInt(120, 320)));
@@ -476,9 +1048,9 @@
   function injectUAForPage(uaString) {
     try {
       const code = `Object.defineProperty(navigator, 'userAgent', {get: ()=>"${uaString}", configurable:true});Object.defineProperty(navigator, 'appVersion', {get: ()=>"${uaString}", configurable:true});`;
-      const s = document.createElement('script'); s.textContent = code; (document.documentElement||document.head||document.body).appendChild(s); s.remove();
-      logEvent('ua','set:'+uaString.slice(0,40)+'...');
-    } catch (e) { logEvent('ua','inject-fail:'+e.message); }
+      const s = document.createElement('script'); s.textContent = code; (document.documentElement || document.head || document.body).appendChild(s); s.remove();
+      logEvent('ua', 'set:' + uaString.slice(0, 40) + '...');
+    } catch (e) { logEvent('ua', 'inject-fail:' + e.message); }
   }
   function maybeRotateUA() {
     if (!CONFIG.uaRotate) return;
@@ -504,10 +1076,10 @@
       if (pausedByVisibility) {
         pausedByVisibility = false;
         // resume after a randomized short delay
-        const delay = randInt(Math.max(minDelay,5000), Math.max(maxDelay,10000));
+        const delay = randInt(Math.max(minDelay, 5000), Math.max(maxDelay, 10000));
         showNotification('▶️ Resuming automation after short delay...', 2500);
         logEvent('resume', 'Resumed after tab visible');
-        startCountdown(Math.floor(delay/1000));
+        startCountdown(Math.floor(delay / 1000));
         timerId = setTimeout(() => { if (state.running) doSearch(); }, delay);
       }
     }
@@ -660,7 +1232,7 @@
   requireStartBtn.style.padding = '8px 10px'; requireStartBtn.style.borderRadius = '8px';
   requireStartBtn.style.border = '1px solid #ddd'; requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff';
   requireStartBtn.style.color = CONFIG.requireManualStart ? '#fff' : '#333'; requireStartBtn.style.cursor = 'pointer';
-  requireStartBtn.style.fontSize = '12px'; requireStartBtn.addEventListener('click', () => { CONFIG.requireManualStart = !CONFIG.requireManualStart; saveConfig(CONFIG); requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual Start: ON' : 'Manual Start: OFF'; requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff'; showNotification('Manual start: '+(CONFIG.requireManualStart?'enabled':'disabled'),2000); });
+  requireStartBtn.style.fontSize = '12px'; requireStartBtn.addEventListener('click', () => { CONFIG.requireManualStart = !CONFIG.requireManualStart; saveConfig(CONFIG); requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual Start: ON' : 'Manual Start: OFF'; requireStartBtn.style.background = CONFIG.requireManualStart ? '#2b6cb0' : '#fff'; showNotification('Manual start: ' + (CONFIG.requireManualStart ? 'enabled' : 'disabled'), 2000); });
   controls.appendChild(requireStartBtn);
 
   // Spread mode toggle (encourages spacing across day)
@@ -668,7 +1240,7 @@
   spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF';
   spreadBtn.style.padding = '8px 10px'; spreadBtn.style.borderRadius = '8px'; spreadBtn.style.border = '1px solid #ddd';
   spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff'; spreadBtn.style.color = CONFIG.spreadMode ? '#fff' : '#333'; spreadBtn.style.cursor = 'pointer'; spreadBtn.style.fontSize = '12px';
-  spreadBtn.addEventListener('click', () => { CONFIG.spreadMode = !CONFIG.spreadMode; saveConfig(CONFIG); spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF'; spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff'; showNotification('Spread mode: '+(CONFIG.spreadMode?'enabled':'disabled'),2000); });
+  spreadBtn.addEventListener('click', () => { CONFIG.spreadMode = !CONFIG.spreadMode; saveConfig(CONFIG); spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF'; spreadBtn.style.background = CONFIG.spreadMode ? '#2b6cb0' : '#fff'; showNotification('Spread mode: ' + (CONFIG.spreadMode ? 'enabled' : 'disabled'), 2000); });
   controls.appendChild(spreadBtn);
 
   // Hourly cap edit
@@ -688,22 +1260,9 @@
   resetAllBtn.addEventListener('click', () => {
     if (!confirm('This will clear seen list, logs, counters and config. Continue?')) return;
     localStorage.removeItem('bingAutoSeen'); localStorage.removeItem('bingAutoLog'); localStorage.removeItem('bingAutoDaily'); localStorage.removeItem('bingAutoHourly'); localStorage.removeItem('bingAutoConfig'); localStorage.removeItem('bingAutoState');
-    seenSet = new Set(); eventLog = []; DAILY = loadDaily(); HOURLY = loadHourly(); CONFIG = loadConfig(); showNotification('All data cleared. Reload the page.', 3000); logEvent('reset','user-reset-all');
+    seenSet = new Set(); eventLog = []; DAILY = loadDaily(); HOURLY = loadHourly(); CONFIG = loadConfig(); showNotification('All data cleared. Reload the page.', 3000); logEvent('reset', 'user-reset-all');
   });
   controls.appendChild(resetAllBtn);
-
-  // Troubleshoot button (modal)
-  const troubleshootBtn = document.createElement('button');
-  troubleshootBtn.textContent = 'Troubleshoot'; troubleshootBtn.style.padding = '8px 10px'; troubleshootBtn.style.borderRadius = '8px'; troubleshootBtn.style.border = '1px solid #ddd'; troubleshootBtn.style.background = '#17a2b8'; troubleshootBtn.style.color = '#fff'; troubleshootBtn.style.cursor = 'pointer'; troubleshootBtn.style.fontSize = '12px';
-  troubleshootBtn.addEventListener('click', () => {
-    // show modal with steps Bing recommended
-    const overlay = document.createElement('div'); overlay.style.position='fixed'; overlay.style.inset='0'; overlay.style.background='rgba(0,0,0,0.6)'; overlay.style.zIndex='100000'; overlay.style.display='flex'; overlay.style.alignItems='center'; overlay.style.justifyContent='center';
-    const box = document.createElement('div'); box.style.background='#fff'; box.style.color='#000'; box.style.padding='18px'; box.style.maxWidth='560px'; box.style.borderRadius='10px'; box.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)';
-    box.innerHTML = `<h3>Troubleshooting steps (from Bing)</h3><ol><li>Clear app cache & data (or browser cache).</li><li>Reinstall the Bing app (or refresh your browser extension/script).</li><li>Spread out searches across the day. Avoid rapid back-to-back searches.</li><li>Disable automation tools and scripts when troubleshooting.</li></ol><p>Buttons below help you clear script data or disable automation temporarily.</p>`;
-    const close = document.createElement('button'); close.textContent='Close'; close.style.marginTop='10px'; close.addEventListener('click', () => overlay.remove()); box.appendChild(close);
-    overlay.appendChild(box); document.body.appendChild(overlay);
-  });
-  controls.appendChild(troubleshootBtn);
 
   function updateBadge() {
     // update button enabled state
@@ -763,12 +1322,12 @@
 
     // daily cap check
     if (DAILY.count >= CONFIG.dailyCap) {
-      state.running = false; saveState(); updateBadge(); showNotification('⚠️ Daily cap reached. Automation stopped.', 4000); logEvent('stop','Daily cap reached'); return;
+      state.running = false; saveState(); updateBadge(); showNotification('⚠️ Daily cap reached. Automation stopped.', 4000); logEvent('stop', 'Daily cap reached'); return;
     }
     // hourly cap check
     const currentHour = Math.floor(Date.now() / 3600000);
     if (HOURLY.hour !== currentHour) { HOURLY = { hour: currentHour, count: 0 }; }
-    if (HOURLY.count >= CONFIG.maxPerHour) { state.running = false; saveState(); updateBadge(); showNotification('⚠️ Hourly cap reached. Automation stopped.', 4000); logEvent('stop','Hourly cap reached'); return; }
+    if (HOURLY.count >= CONFIG.maxPerHour) { state.running = false; saveState(); updateBadge(); showNotification('⚠️ Hourly cap reached. Automation stopped.', 4000); logEvent('stop', 'Hourly cap reached'); return; }
     // build list of unseen phrases
     const unseen = words.filter(w => !seenSet.has(w));
     if (unseen.length === 0) {
@@ -781,17 +1340,17 @@
       return;
     }
 
-  const randomWord = unseen[randInt(0, unseen.length - 1)];
+    const randomWord = unseen[randInt(0, unseen.length - 1)];
     // mark seen
     seenSet.add(randomWord);
     saveSeen();
-  state.count++;
-  saveState();
-  incrementDaily();
-  incrementHourly();
-  hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
-  dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
-  logEvent('search', `Searching: ${randomWord}`);
+    state.count++;
+    saveState();
+    incrementDaily();
+    incrementHourly();
+    hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
+    dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
+    logEvent('search', `Searching: ${randomWord}`);
 
     showNotification(`🔍 [${state.count}/${maxSearches}] Searching: "${randomWord}"`, 2500);
 
@@ -799,7 +1358,7 @@
     // defensive interstitial detection right before navigating
     const inter = detectInterstitial();
     if (inter) {
-      state.running = false; saveState(); updateBadge(); showNotification('🛑 Stopped: interstitial detected ('+inter+').', 5000); logEvent('stop','interstitial:'+inter); return;
+      state.running = false; saveState(); updateBadge(); showNotification('🛑 Stopped: interstitial detected (' + inter + ').', 5000); logEvent('stop', 'interstitial:' + inter); return;
     }
     if (input) {
       maybeRotateUA();
@@ -860,7 +1419,7 @@
   }
 
   // Browsing mode behavior: if enabled and this is a bing search results page
-  (function setupBrowsingHook(){
+  (function setupBrowsingHook() {
     if (!CONFIG.browsingMode) return;
     // Only act on search results pages
     function isSearchPage() {
@@ -879,18 +1438,18 @@
         const selectors = ['#b_results .b_algo a', '.b_algo a'];
         let anchor = null;
         for (const s of selectors) { const el = document.querySelector(s); if (el) { anchor = el; break; } }
-        if (!anchor) { logEvent('browse','no-anchor-found'); return; }
+        if (!anchor) { logEvent('browse', 'no-anchor-found'); return; }
 
         // open link in same tab (simulate click)
-        logEvent('browse','opening first result');
+        logEvent('browse', 'opening first result');
         anchor.click();
 
         // dwell for randomized seconds then go back
         const dwell = randInt(CONFIG.browseDwellMin, CONFIG.browseDwellMax) * 1000;
         setTimeout(() => {
-          try { history.back(); logEvent('browse','returned after dwell'); } catch (e) { logEvent('browse','return-failed'); }
+          try { history.back(); logEvent('browse', 'returned after dwell'); } catch (e) { logEvent('browse', 'return-failed'); }
         }, dwell);
-      } catch (e) { logEvent('browse','error:'+e.message); }
+      } catch (e) { logEvent('browse', 'error:' + e.message); }
     }, randInt(1200, 2600));
   })();
 
