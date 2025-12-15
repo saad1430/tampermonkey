@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         YTS Enhancer - Cleaner Browsing Pages
 // @namespace    Saad1430
+// @author       Saad1430
 // @version      1.0
 // @description  Make YTS feel better and easier to use! This script adds aesthetic CSS improvements, smarter pagination navigation, visual highlighting on the navbar to show your current section, and customizable options so you can tweak it exactly how you want.
 // @match        https://yts.lt/*
