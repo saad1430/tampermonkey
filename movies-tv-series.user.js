@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Movie/TV Shows Links enhancer
+// @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.5.1
+// @version      1.5.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -50,6 +50,8 @@
     enableTrailerAutoPlay: false,    // auto-play trailer when opened
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true,        // fetch + display MPAA/TV rating
+    useOldTraktUI: true,             // redirect to old trakt UI from new one
+    enableTransparencyMode: true     // use transparency mode for modals/panels
   };
 
 
@@ -57,11 +59,19 @@
   * Announcements (What's New)
   * -------------------------------------------------- */
 
-  const ANNOUNCEMENT_VERSION = "1.5.0";
+  const SCRIPT_NAME = GM_info.script.name;
+  const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added YTS support</li>
+      <li>Added CinemaOS to streaming list</li>
+      <li>Added CinemaOS to frontend list</li>
+      <li>Added PStream to frontend list</li>
+      <li>Removed XPrime from frontend list as it is no longer supported</li>
+      <li>Trakt new UI will now fallback to old one but can be disabled in settings (new UI will be compatible soon)</li>
+      <li>Improved UI responsiveness</li>
+      <li>Various minor improvements and fixes</li>
+      <li>Remember to check settings (Shift+R) for new options!</li>
     </ul>
   `;
 
@@ -83,7 +93,7 @@
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-announcement-overlay';
     overlay.innerHTML = `
-    <div class="tmdb-announcement-box">
+    <div class="tmdb-announcement-box ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}">
       <button class="tmdb-announcement-close">✕</button>
       <div class="tmdb-announcement-content">${messageHTML}</div>
     </div>
@@ -113,15 +123,17 @@
   * -------------------------------------------------- */
 
   GM_addStyle(`
+    .transparency{background:hsla(212, 59%, 11%, 0.45);backdrop-filter: blur(7px);color:#e9f1f7}
+    .no-transparency{background:#0b1a2b;color:#e9f1f7}
     .tmdb-settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999999;display:flex;align-items:center;justify-content:center}
-    .tmdb-settings{width:min(560px,94vw);max-height:88vh;overflow:auto;background:#0b1a2b;color:#e9f1f7;border:1px solid #1bb8d9;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .tmdb-settings{width: clamp(50vw, 94vw, 560px);max-height:88vh;overflow:auto;border:1px solid #1bb8d9;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
     .tmdb-settings header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(27,184,217,.35)}
     .tmdb-settings header h2{margin:0;font-size:18px}
     .tmdb-settings .body{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .tmdb-settings .body .full{grid-column:1/-1}
-    .tmdb-settings label{display:flex;gap:8px;align-items:center;padding:8px 10px;background:#0f2640;border:1px solid rgba(255,255,255,.06);border-radius:8px}
+    .tmdb-settings label{display:flex;gap:8px;align-items:center;padding:8px 10px;background:hsla(212, 62%, 16%, 0.5);backdrop-filter: blur(7px);cursor:pointer;border:1px solid rgba(255,255,255,.06);border-radius:8px;color:#e9f1f7;font-weight:600;user-select:none}
     .tmdb-settings .row{display:flex;gap:8px;align-items:center}
-    .tmdb-settings input[type="text"], .tmdb-settings textarea{width:100%;background:#071221;color:#e9f1f7;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px}
+    .tmdb-settings input[type="text"], .tmdb-settings textarea{width:98%;background:#071221;color:#e9f1f7;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px}
     .tmdb-settings footer{display:flex;gap:8px;justify-content:flex-end;padding:14px 16px;border-top:1px solid rgba(27,184,217,.35)}
     .tmdb-btn{cursor:pointer;border:none;border-radius:8px;padding:8px 12px;font-weight:600}
     .tmdb-btn.primary{background:#1bb8d9;color:#062538}
@@ -155,7 +167,7 @@
   .tmdb-trailer-content iframe{width:100%;height:100%;border:0;background:#000}
   .tmdb-trailer-close{position:absolute;right:8px;top:8px;z-index:10;background:rgba(255,255,255,.06);border:none;color:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
   .tmdb-announcement-overlay {position: fixed;inset: 0;background: rgba(0,0,0,0.75);z-index: 9999999;display: flex;align-items: center;justify-content: center;}
-  .tmdb-announcement-box {background: rgb(3,37,65);color: #e9f1f7;border-radius: 12px;padding: 20px 24px;width: min(90vw, 450px);box-shadow: 0 0 30px rgba(0,0,0,0.5);position: relative;animation: fadeIn 0.25s ease-out;}
+  .tmdb-announcement-box {border-radius: 12px;padding: 20px 24px;width: min(90vw, 450px);box-shadow: 0 0 30px rgba(0,0,0,0.5);position: relative;animation: fadeIn 0.25s ease-out;}
   .tmdb-announcement-close {position: absolute;right: 10px;top: 8px;background: rgba(255,255,255,0.1);border: none;color: #fff;border-radius: 4px;padding: 4px 8px;cursor: pointer;}
   .tmdb-announcement-content {margin-top: 10px;font-size: 15px;}
   @keyframes fadeIn {from { opacity: 0; transform: scale(0.95); }to { opacity: 1; transform: scale(1); }}
@@ -254,9 +266,9 @@
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-settings-overlay';
     overlay.innerHTML = `
-      <div class="tmdb-settings" role="dialog" aria-modal="true">
+      <div class="tmdb-settings  ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" role="dialog" aria-modal="true">
         <header>
-          <h2>Movies/TV Shows Script Settings</h2>
+          <h2>${SCRIPT_NAME} Settings <b>(v${ANNOUNCEMENT_VERSION})</b></h2>
           <button class="tmdb-btn ghost" id="tmdb-close">✕</button>
         </header>
         <div class="body">
@@ -278,6 +290,8 @@
           ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
+          ${checkbox('useOldTraktUI', 'Use old Trakt UI (new one will be compatible soon)', SETTINGS.useOldTraktUI)}
+          ${checkbox('enableTransparencyMode', 'Enable transparency mode for modals/panels', SETTINGS.enableTransparencyMode)}
 
           <div class="full">
             <label class="full" style="flex-direction:column;align-items:flex-start">
@@ -369,13 +383,10 @@
     let multiQuery = '';
     let html = '';
     let eztv = '';
-    let imdb_link = '';
     // use specified season/episode if provided (e.g. Trakt preview links), otherwise default to 1
     let season_number = specifiedSeason ? Number(specifiedSeason) : 1;
     let episode_number = specifiedEpisode ? Number(specifiedEpisode) : 1;
     let torrentLinks = [];
-
-    if (imdb) imdb_link = `https://www.imdb.com/title/${imdb}`;
 
     if (Type === 'movie') {
       vidType = 'movie';
@@ -421,7 +432,8 @@
 
         ${SETTINGS.enableStreamingLinks ? `
         <div style="margin-top:6px;">
-          <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (fastest) ↗</a><br/>
+          <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (recommended) ↗</a><br/>
+          <a href="https://cinemaos.tech/player/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.tech (fastest) ↗</a><br/>
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
@@ -437,10 +449,12 @@
           <strong>Watch on frontends:</strong><br/>
           <a href="https://www.cineby.gd/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby.gd</a>
           <a href="https://www.cineby.gd/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.live ↗</a>
+          <a href="https://cinemaos.live/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
           <a href="https://flixer.sh/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Flixer.sh ↗</a>
           <a href="https://flixer.sh/?${vidType}=${title}&id=${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
           <a href="https://veloratv.ru/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VeloraTV.ru ↗</a><br/>
-          <a href="https://xprime.tv/watch/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on xprime.tv ↗</a><br/>
+          <a href="https://pstream.mov/media/tmdb-${vidType}-${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on PStream.mov ↗</a> ${vidType === "tv" ? "(Auto Episode Not Available)" : "(4K possible)"}<br/>
         </div>` : ''}
 
         ${html}
@@ -1087,7 +1101,7 @@
 
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-overlay';
-    overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+    overlay.innerHTML = `<div class="tmdb-overlay-inner  ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
     document.body.appendChild(overlay);
 
     overlay.addEventListener('click', e => {
@@ -1110,16 +1124,13 @@
     .tmdb-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.8);
+      background: rgba(0,0,0,0.2);
       z-index: 9999999;
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(4px);
     }
     .tmdb-overlay-inner {
-      background: rgb(3,37,65);
-      color: #e9f1f7;
       border-radius: 12px;
       padding: 20px;
       width: min(90vw, 950px);
@@ -1140,6 +1151,9 @@
     let watchBtn = document.querySelector('a.btn-watch-now');
     if (!watchBtn) {
       console.warn('Trakt: Watch Now button not found.');
+    }
+    if (watchBtn) {
+      showNotification('Trakt "Watch Now" button hijacked. Click to open overlay or use SHIFT+P on any supported site to open it.', 3000);
     }
 
     // capture optional season/episode if present in the TMDb URL
@@ -1213,7 +1227,7 @@
 
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-overlay';
-    overlay.innerHTML = `<div class="tmdb-overlay-inner" id="tmdb-overlay-inner"></div>`;
+    overlay.innerHTML = `<div class="tmdb-overlay-inner  ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
@@ -1238,6 +1252,25 @@
   * -------------------------------------------------- */
 
   function newTraktHandler() {
+    if (SETTINGS.useOldTraktUI) {
+      // If we're on the app.trakt.tv subdomain, redirect to the main trakt.tv by removing the "app." prefix
+      try {
+        const loc = window.location;
+        if (loc && loc.hostname && loc.hostname.startsWith('app.')) {
+          const newHost = loc.hostname.replace(/^app\./, '');
+          const newUrl = loc.protocol + '//' + newHost + loc.pathname + loc.search + loc.hash;
+          showNotification('Redirecting to old version of Trakt.tv (To disable this behavior, uncheck "Use old Trakt UI" in settings)', 2000);
+          setTimeout(() => {
+            window.location.href = newUrl;
+            return;
+          }, 2000);
+          // perform redirect and stop further execution
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to redirect Trakt new UI:', e);
+      }
+    }
     showNotification('TMDb Enhancer: Trakt new UI detected. Underdevelopment, please wait!', 8000);
   }
 
