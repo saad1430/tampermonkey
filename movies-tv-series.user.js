@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.5.2
+// @version      1.5.3
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -14,6 +14,7 @@
 // @match        https://app.trakt.tv/movies/*
 // @match        https://app.trakt.tv/shows/*
 // @match        https://yts.lt/movies/*
+// @match        https://yts.bz/movies/*
 // @match        https://yts.mx/movies/*
 // @match        https://yts.ag/movies/*
 // @match        https://yts.am/movies/*
@@ -64,14 +65,7 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added CinemaOS to streaming list</li>
-      <li>Added CinemaOS to frontend list</li>
-      <li>Added PStream to frontend list</li>
-      <li>Removed XPrime from frontend list as it is no longer supported</li>
-      <li>Trakt new UI will now fallback to old one but can be disabled in settings (new UI will be compatible soon)</li>
-      <li>Improved UI responsiveness</li>
-      <li>Various minor improvements and fixes</li>
-      <li>Remember to check settings (Shift+R) for new options!</li>
+      <li>Changed YTS domain to the latest Top Level Domain i.e <a href="https://yts.bz" target="_blank">YTS.BZ</a></li>
     </ul>
   `;
 
@@ -201,7 +195,7 @@
   const isImdb = hostname.includes('imdb.com');
   const isTrakt = hostname.includes('trakt.tv');
   const isNewTrakt = hostname.includes('app.trakt.tv');
-  const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
+  const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.bz') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
 
   function isSearch() {
     if (isGoogle || isBing || isDuckDuckGo) return true;
@@ -747,7 +741,7 @@
   // Process a single TMDb search result: fetch IMDb id, optional YTS torrents, then render
   async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
-    const ytsAPI = `https://yts.lt/api/v2/list_movies.json?query_term=`;
+    const ytsAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
     try {
       // remove any existing info card before rendering the new one
       const existing = parent.querySelector('.tmdb-info-card');
