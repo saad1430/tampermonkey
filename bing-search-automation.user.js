@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bing Random Search Automation
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
+// @version      1.5.1
 // @description  Automates Bing searches with human-like delays. Keybinds + notifications + clean Bing-styled status badge included.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/bing-automation-100.png
 // @author       Saad1430
@@ -99,8 +99,7 @@
   // );
 
   const maxSearches = 32;
-  const minDelay = 15000;  // 15 sec
-  const maxDelay = 60000; // 60 sec
+  // minDelay and maxDelay are now in CONFIG (defaults set below)
 
   // Notification queue system
   const notificationQueue = [];
@@ -167,6 +166,9 @@
   let timerId = null;
   let countdownInterval = null;
   let nextDelay = 0;
+  let isSearching = false; // Guard flag to prevent concurrent searches
+  let isResuming = false; // Guard flag to prevent concurrent resume attempts
+  let browsingActive = false; // Guard flag for browsing mode
 
   function saveState() {
     localStorage.setItem("bingAutoState", JSON.stringify(state));
@@ -209,6 +211,17 @@
   if (typeof CONFIG.spreadMode !== 'boolean') CONFIG.spreadMode = false;
   if (typeof CONFIG.uaRotate !== 'boolean') CONFIG.uaRotate = false;
   if (typeof CONFIG.uaChangeEvery !== 'number') CONFIG.uaChangeEvery = 2;
+  if (typeof CONFIG.minDelay !== 'number') CONFIG.minDelay = 15000; // 15 seconds in milliseconds
+  if (typeof CONFIG.maxDelay !== 'number') CONFIG.maxDelay = 60000; // 60 seconds in milliseconds
+  
+  // Ensure minDelay is less than maxDelay
+  if (CONFIG.minDelay >= CONFIG.maxDelay) {
+    CONFIG.minDelay = Math.max(5000, CONFIG.maxDelay - 10000); // Ensure at least 5s gap
+  }
+  
+  // Helper functions to get delays (for backward compatibility and easier access)
+  function getMinDelay() { return CONFIG.minDelay; }
+  function getMaxDelay() { return CONFIG.maxDelay; }
 
   // Daily counter to avoid too many searches per calendar day
   function loadDaily() {
@@ -264,6 +277,143 @@
       for (const c of checks) if (txt.includes(c)) return c;
       return null;
     } catch (e) { return null; }
+  }
+
+  // Detect if we're in an overlay/modal (like Bing Rewards overlay)
+  function isInOverlay() {
+    try {
+      // Check for Bing Rewards specific overlay first (most common issue)
+      const rewardsSelectors = [
+        '#rewards-overlay',
+        '[id*="rewards"][id*="overlay"]',
+        '[id*="rewards"][id*="modal"]',
+        '[class*="rewards"][class*="overlay"]',
+        '[class*="rewards"][class*="modal"]',
+        '[class*="rewards"][class*="dialog"]',
+        '[data-module="rewards"]',
+        '.rewards-overlay',
+        '.rewards-modal'
+      ];
+      for (const selector of rewardsSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          const style = window.getComputedStyle(el);
+          if (style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity) > 0) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // Check for common overlay/modal indicators
+      const overlaySelectors = [
+        '[class*="overlay"]',
+        '[class*="modal"]',
+        '[class*="dialog"]',
+        '[id*="overlay"]',
+        '[id*="modal"]',
+        '[id*="dialog"]',
+        '[role="dialog"]',
+        '[role="alertdialog"]'
+      ];
+      
+      for (const selector of overlaySelectors) {
+        const overlays = document.querySelectorAll(selector);
+        for (const overlay of overlays) {
+          const style = window.getComputedStyle(overlay);
+          if (style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity) > 0) {
+            const rect = overlay.getBoundingClientRect();
+            // If overlay covers more than 25% of viewport, consider it active
+            if (rect.width > 0 && rect.height > 0 && 
+                rect.width * rect.height > window.innerWidth * window.innerHeight * 0.25) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // Check if body has overlay class or style (body locked = overlay likely open)
+      if (document.body) {
+        const bodyStyle = window.getComputedStyle(document.body);
+        if (bodyStyle.overflow === 'hidden' || bodyStyle.position === 'fixed') {
+          // Check if there's a visible overlay element
+          const hasVisibleOverlay = document.querySelector('[class*="overlay"]:not([style*="display: none"]), [class*="modal"]:not([style*="display: none"])');
+          if (hasVisibleOverlay) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (e) { 
+      logEvent('overlay', 'detection-error:' + e.message);
+      return false; 
+    }
+  }
+
+  // Close any open overlays/modals
+  function closeOverlays() {
+    try {
+      // Try to find and click close buttons (prioritize common ones)
+      const closeSelectors = [
+        'button[aria-label*="close" i]',
+        'button[aria-label*="Close" i]',
+        '[aria-label*="close" i]',
+        '[aria-label*="Close" i]',
+        'button[class*="close"]',
+        'button[class*="dismiss"]',
+        '[class*="close-button"]',
+        '[class*="dismiss-button"]',
+        '.cib-close-button',
+        '[id*="close-button"]',
+        '[id*="dismiss-button"]',
+        '[class*="close"]',
+        '[class*="dismiss"]',
+        '[id*="close"]'
+      ];
+      
+      for (const selector of closeSelectors) {
+        const closeBtns = document.querySelectorAll(selector);
+        for (const closeBtn of closeBtns) {
+          if (closeBtn && closeBtn.offsetParent !== null) { // Check if visible
+            const style = window.getComputedStyle(closeBtn);
+            if (style.display !== 'none' && style.visibility !== 'hidden') {
+              closeBtn.click();
+              logEvent('overlay', 'closed via button');
+              return true;
+            }
+          }
+        }
+      }
+      
+      // Try ESC key simulation (works for many modals)
+      const escEvent = new KeyboardEvent('keydown', { 
+        key: 'Escape', 
+        keyCode: 27, 
+        code: 'Escape',
+        bubbles: true,
+        cancelable: true
+      });
+      document.dispatchEvent(escEvent);
+      document.dispatchEvent(new KeyboardEvent('keyup', { 
+        key: 'Escape', 
+        keyCode: 27, 
+        bubbles: true 
+      }));
+      
+      // Check if overlay closed after ESC
+      setTimeout(() => {
+        if (!isInOverlay()) {
+          logEvent('overlay', 'closed via ESC');
+        }
+      }, 200);
+      
+      return false; // ESC might work but we can't confirm immediately
+    } catch (e) { 
+      logEvent('overlay', 'close-error:' + e.message);
+      return false; 
+    }
   }
 
   // --- Typing simulation (human-like) ---
@@ -330,24 +480,58 @@
 
   // Visibility pause/resume
   let pausedByVisibility = false;
+  let visibilityResumeTimer = null;
+  let visibilityPauseTime = null; // Track when we paused
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (state.running) {
         pausedByVisibility = true;
-        clearTimeout(timerId); clearInterval(countdownInterval);
-        showNotification('⏸️ Paused (tab hidden). Will resume when visible.', 3000);
+        visibilityPauseTime = Date.now();
+        // Clear any existing resume timer
+        if (visibilityResumeTimer) {
+          clearTimeout(visibilityResumeTimer);
+          visibilityResumeTimer = null;
+        }
+        if (timerId) {
+          clearTimeout(timerId);
+          timerId = null;
+        }
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        nextDelay = 0; // Reset countdown
         updateBadge();
+        showNotification('⏸️ Paused (tab hidden). Will resume when visible.', 3000);
         logEvent('pause', 'Paused due to tab hidden');
       }
     } else {
-      if (pausedByVisibility) {
+      if (pausedByVisibility && state.running) {
+        const pauseDuration = visibilityPauseTime ? Date.now() - visibilityPauseTime : 0;
         pausedByVisibility = false;
-        // resume after a randomized short delay
-        const delay = randInt(Math.max(minDelay, 5000), Math.max(maxDelay, 10000));
-        showNotification('▶️ Resuming automation after short delay...', 2500);
-        logEvent('resume', 'Resumed after tab visible');
-        startCountdown(Math.floor(delay / 1000));
-        timerId = setTimeout(() => { if (state.running) doSearch(); }, delay);
+        visibilityPauseTime = null;
+        // Clear any existing resume timer
+        if (visibilityResumeTimer) {
+          clearTimeout(visibilityResumeTimer);
+          visibilityResumeTimer = null;
+        }
+        // Clear any existing timer first
+        if (timerId) {
+          clearTimeout(timerId);
+          timerId = null;
+        }
+        // Reset flags to allow resume
+        isResuming = false;
+        isSearching = false;
+        // Use checkAndResume to properly handle the resume logic
+        // This ensures we're on the right page and sets up the timer correctly
+        showNotification('▶️ Resuming automation...', 2500);
+        logEvent('resume', 'Resumed after tab visible (paused for ' + Math.round(pauseDuration / 1000) + 's)');
+        // Small delay to ensure page is ready, then use checkAndResume
+        visibilityResumeTimer = setTimeout(() => {
+          visibilityResumeTimer = null;
+          if (state.running) {
+            checkAndResume();
+          }
+        }, 500);
       }
     }
   });
@@ -591,6 +775,66 @@
   });
   settingsContainer.appendChild(hourlyBtn);
 
+  // Min Delay button
+  const minDelayBtn = document.createElement('button');
+  minDelayBtn.textContent = `Min: ${Math.round(CONFIG.minDelay / 1000)}s`;
+  minDelayBtn.title = 'Click to change minimum delay between searches (in seconds)';
+  minDelayBtn.style.padding = '6px 8px';
+  minDelayBtn.style.borderRadius = '6px';
+  minDelayBtn.style.border = '1px solid #ddd';
+  minDelayBtn.style.background = '#fff';
+  minDelayBtn.style.color = '#333';
+  minDelayBtn.style.cursor = 'pointer';
+  minDelayBtn.style.fontSize = '11px';
+  minDelayBtn.addEventListener('click', () => {
+    const currentSeconds = Math.round(CONFIG.minDelay / 1000);
+    const next = parseInt(prompt(`Set minimum delay between searches (in seconds, current: ${currentSeconds}s, minimum: 5s):`, currentSeconds), 10);
+    if (!isNaN(next) && next >= 5) {
+      const newDelay = next * 1000; // Convert to milliseconds
+      if (newDelay < CONFIG.maxDelay) {
+        CONFIG.minDelay = newDelay;
+        saveConfig(CONFIG);
+        showNotification(`✅ Min delay set to ${next}s`, 2000);
+        minDelayBtn.textContent = `Min: ${next}s`;
+      } else {
+        showNotification(`❌ Min delay must be less than max delay (${Math.round(CONFIG.maxDelay / 1000)}s)`, 3000);
+      }
+    } else if (!isNaN(next) && next < 5) {
+      showNotification('❌ Minimum delay must be at least 5 seconds', 3000);
+    }
+  });
+  settingsContainer.appendChild(minDelayBtn);
+
+  // Max Delay button
+  const maxDelayBtn = document.createElement('button');
+  maxDelayBtn.textContent = `Max: ${Math.round(CONFIG.maxDelay / 1000)}s`;
+  maxDelayBtn.title = 'Click to change maximum delay between searches (in seconds)';
+  maxDelayBtn.style.padding = '6px 8px';
+  maxDelayBtn.style.borderRadius = '6px';
+  maxDelayBtn.style.border = '1px solid #ddd';
+  maxDelayBtn.style.background = '#fff';
+  maxDelayBtn.style.color = '#333';
+  maxDelayBtn.style.cursor = 'pointer';
+  maxDelayBtn.style.fontSize = '11px';
+  maxDelayBtn.addEventListener('click', () => {
+    const currentSeconds = Math.round(CONFIG.maxDelay / 1000);
+    const next = parseInt(prompt(`Set maximum delay between searches (in seconds, current: ${currentSeconds}s, minimum: 10s):`, currentSeconds), 10);
+    if (!isNaN(next) && next >= 10) {
+      const newDelay = next * 1000; // Convert to milliseconds
+      if (newDelay > CONFIG.minDelay) {
+        CONFIG.maxDelay = newDelay;
+        saveConfig(CONFIG);
+        showNotification(`✅ Max delay set to ${next}s`, 2000);
+        maxDelayBtn.textContent = `Max: ${next}s`;
+      } else {
+        showNotification(`❌ Max delay must be greater than min delay (${Math.round(CONFIG.minDelay / 1000)}s)`, 3000);
+      }
+    } else if (!isNaN(next) && next < 10) {
+      showNotification('❌ Maximum delay must be at least 10 seconds', 3000);
+    }
+  });
+  settingsContainer.appendChild(maxDelayBtn);
+
   const resetAllBtn = document.createElement('button');
   resetAllBtn.textContent = 'Reset All';
   resetAllBtn.style.padding = '6px 8px';
@@ -613,11 +857,16 @@
     DAILY = loadDaily();
     HOURLY = loadHourly();
     CONFIG = loadConfig();
+    // Reset defaults if needed
+    if (typeof CONFIG.minDelay !== 'number') CONFIG.minDelay = 15000;
+    if (typeof CONFIG.maxDelay !== 'number') CONFIG.maxDelay = 60000;
     showNotification('🧹 All data cleared. Reload to apply.', 3000);
     logEvent('reset', 'user-reset-all');
     // Update buttons
     dailyCapBtn.textContent = `Daily: ${DAILY.count}/${CONFIG.dailyCap}`;
     hourlyBtn.textContent = `Hour: ${HOURLY.count}/${CONFIG.maxPerHour}`;
+    minDelayBtn.textContent = `Min: ${Math.round(CONFIG.minDelay / 1000)}s`;
+    maxDelayBtn.textContent = `Max: ${Math.round(CONFIG.maxDelay / 1000)}s`;
     browseToggle.textContent = CONFIG.browsingMode ? 'Browse: ON' : 'Browse: OFF';
     requireStartBtn.textContent = CONFIG.requireManualStart ? 'Manual: ON' : 'Manual: OFF';
     spreadBtn.textContent = CONFIG.spreadMode ? 'Spread: ON' : 'Spread: OFF';
@@ -645,23 +894,49 @@
 
   function startCountdown(seconds) {
     nextDelay = seconds;
-    clearInterval(countdownInterval);
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
     updateBadge();
     countdownInterval = setInterval(() => {
       if (!state.running) {
         clearInterval(countdownInterval);
+        countdownInterval = null;
         return;
       }
       if (nextDelay > 0) {
         nextDelay--;
         updateBadge();
+      } else {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
       }
     }, 1000);
   }
 
   function doSearch() {
+    // Guard against concurrent execution
+    if (isSearching) {
+      logEvent('search', 'Skipped - search already in progress');
+      return;
+    }
+
+    // Check if we're in an overlay - close it first
+    if (isInOverlay()) {
+      logEvent('search', 'Overlay detected, attempting to close');
+      if (closeOverlays()) {
+        // Wait a bit for overlay to close, then retry
+        setTimeout(() => {
+          if (state.running && !isSearching) doSearch();
+        }, 500);
+        return;
+      }
+    }
+
     if (!state.running || state.count >= maxSearches) {
       state.running = false;
+      isSearching = false;
       saveState();
       clearInterval(countdownInterval);
       updateBadge();
@@ -671,23 +946,46 @@
 
     // daily cap check
     if (DAILY.count >= CONFIG.dailyCap) {
-      state.running = false; saveState(); updateBadge(); showNotification('⚠️ Daily cap reached. Automation stopped.', 4000); logEvent('stop', 'Daily cap reached'); return;
+      state.running = false; 
+      isSearching = false;
+      saveState(); 
+      updateBadge(); 
+      showNotification('⚠️ Daily cap reached. Automation stopped.', 4000); 
+      logEvent('stop', 'Daily cap reached'); 
+      return;
     }
+    
     // hourly cap check
     const currentHour = Math.floor(Date.now() / 3600000);
-    if (HOURLY.hour !== currentHour) { HOURLY = { hour: currentHour, count: 0 }; }
-    if (HOURLY.count >= CONFIG.maxPerHour) { state.running = false; saveState(); updateBadge(); showNotification('⚠️ Hourly cap reached. Automation stopped.', 4000); logEvent('stop', 'Hourly cap reached'); return; }
+    if (HOURLY.hour !== currentHour) { 
+      HOURLY = { hour: currentHour, count: 0 }; 
+      saveHourly(HOURLY);
+    }
+    if (HOURLY.count >= CONFIG.maxPerHour) { 
+      state.running = false; 
+      isSearching = false;
+      saveState(); 
+      updateBadge(); 
+      showNotification('⚠️ Hourly cap reached. Automation stopped.', 4000); 
+      logEvent('stop', 'Hourly cap reached'); 
+      return; 
+    }
+    
     // build list of unseen phrases
     const unseen = words.filter(w => !seenSet.has(w));
     if (unseen.length === 0) {
       // nothing left to search
       state.running = false;
+      isSearching = false;
       saveState();
       clearInterval(countdownInterval);
       updateBadge();
       showNotification('✅ All phrases have been searched once. Reset seen list to run again.', 5000);
       return;
     }
+
+    // Set searching flag
+    isSearching = true;
 
     const randomWord = unseen[randInt(0, unseen.length - 1)];
     // mark seen
@@ -703,23 +1001,312 @@
 
     showNotification(`🔍 [${state.count}/${maxSearches}] Searching: "${randomWord}"`, 2500);
 
-    const input = document.querySelector("input[name='q']");
+    // First, check if there are any rewards iframes on the page and log them
+    const allIframes = document.querySelectorAll('iframe');
+    let rewardsIframesFound = 0;
+    for (const iframe of allIframes) {
+      try {
+        const src = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
+        if (src.includes('rewards.bing.com') || src.includes('rewards.microsoft.com') || src.includes('/rewards/')) {
+          rewardsIframesFound++;
+          logEvent('search', `Rewards iframe detected: ${src.substring(0, 100)}`);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+    if (rewardsIframesFound > 0) {
+      logEvent('search', `Found ${rewardsIframesFound} rewards iframe(s) on page - will avoid them`);
+    }
+
+    // Find search input - prioritize main page input, avoid iframes
+    // This is critical to prevent affecting Bing Rewards iframes
+    let input = null;
+    
+    // Helper function to check if element is in main document (not in iframe, especially not rewards iframe)
+    function isInMainDocument(element) {
+      if (!element) return false;
+      let current = element;
+      while (current && current !== document.body && current !== document.documentElement) {
+        if (current.tagName === 'IFRAME') {
+          // Check if this iframe is a rewards iframe
+          const iframe = current;
+          const src = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
+          // Check if iframe src contains rewards subdomain
+          if (src.includes('rewards.bing.com') || src.includes('rewards.microsoft.com') || 
+              src.includes('/rewards/') || iframe.id?.toLowerCase().includes('rewards') ||
+              iframe.className?.toLowerCase().includes('rewards')) {
+            logEvent('search', 'Element is inside rewards iframe, skipping');
+            return false; // Element is inside a rewards iframe
+          }
+          // Element is inside some iframe (not rewards, but still not main document)
+          return false;
+        }
+        current = current.parentElement;
+      }
+      return true; // Element is in main document
+    }
+    
+    // Additional check: verify element is not inside any iframe with rewards in URL
+    function isNotInRewardsIframe(element) {
+      if (!element) return false;
+      // Check all iframes on the page
+      const allIframes = document.querySelectorAll('iframe');
+      for (const iframe of allIframes) {
+        try {
+          const src = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
+          const id = iframe.id || '';
+          const className = iframe.className || '';
+          
+          // Check if this is a rewards iframe
+          const isRewardsIframe = src.includes('rewards.bing.com') || 
+                                  src.includes('rewards.microsoft.com') ||
+                                  src.includes('/rewards/') ||
+                                  id.toLowerCase().includes('rewards') ||
+                                  className.toLowerCase().includes('rewards');
+          
+          if (isRewardsIframe) {
+            // Check if element is inside this iframe's content
+            try {
+              // Try to access iframe content (may fail due to cross-origin)
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (iframeDoc && iframeDoc.contains && iframeDoc.contains(element)) {
+                logEvent('search', 'Element found inside rewards iframe content, skipping');
+                return false;
+              }
+            } catch (e) {
+              // Cross-origin, can't access - but we can check if element is a descendant
+              // by checking if iframe is an ancestor
+              let parent = element.parentElement;
+              while (parent) {
+                if (parent === iframe) {
+                  logEvent('search', 'Element is descendant of rewards iframe, skipping');
+                  return false;
+                }
+                parent = parent.parentElement;
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore errors checking iframe
+        }
+      }
+      return true;
+    }
+    
+    // First try to find input in main document (not in iframes, especially not rewards iframes)
+    const mainInputs = document.querySelectorAll("input[name='q']");
+    for (const inp of mainInputs) {
+      // Check if input is in main document (not in iframe) and not in rewards iframe
+      if (isInMainDocument(inp) && isNotInRewardsIframe(inp) && inp.offsetParent !== null) {
+        const rect = inp.getBoundingClientRect();
+        // Verify it's actually visible and has reasonable size
+        if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth) {
+          // Additional check: make sure it's not inside a hidden container
+          const style = window.getComputedStyle(inp);
+          if (style.display !== 'none' && style.visibility !== 'hidden') {
+            // Final check: verify the input's form action doesn't point to rewards
+            const form = inp.closest('form');
+            if (form) {
+              const formAction = form.getAttribute('action') || '';
+              if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+                logEvent('search', 'Input form points to rewards, skipping');
+                continue;
+              }
+            }
+            input = inp;
+            logEvent('search', 'Found main document search input');
+            break;
+          }
+        }
+      }
+    }
+    
+    // Fallback: if no main input found, try standard selector but verify it's not in iframe
+    if (!input) {
+      const fallbackInput = document.querySelector("input[name='q']");
+      if (fallbackInput && isInMainDocument(fallbackInput) && isNotInRewardsIframe(fallbackInput) && fallbackInput.offsetParent !== null) {
+        // Double-check form action
+        const form = fallbackInput.closest('form');
+        if (!form || (!form.getAttribute('action')?.includes('rewards.bing.com') && !form.getAttribute('action')?.includes('rewards.microsoft.com'))) {
+          input = fallbackInput;
+          logEvent('search', 'Using fallback search input');
+        } else {
+          logEvent('search', 'Fallback input form points to rewards, skipping');
+        }
+      } else if (fallbackInput) {
+        logEvent('search', 'Search input found but appears to be in iframe or rewards iframe, skipping');
+      }
+    }
+    
     // defensive interstitial detection right before navigating
     const inter = detectInterstitial();
     if (inter) {
-      state.running = false; saveState(); updateBadge(); showNotification('🛑 Stopped: interstitial detected (' + inter + ').', 5000); logEvent('stop', 'interstitial:' + inter); return;
+      state.running = false; 
+      isSearching = false;
+      saveState(); 
+      updateBadge(); 
+      showNotification('🛑 Stopped: interstitial detected (' + inter + ').', 5000); 
+      logEvent('stop', 'interstitial:' + inter); 
+      return;
     }
+    
     if (input) {
       maybeRotateUA();
       // simulate typing
       simulateTypingInto(input, randomWord).then(() => {
         const form = input.closest("form");
-        if (form) form.submit();
-      }).catch(() => { const form = input.closest("form"); if (form) form.submit(); });
+        if (form) {
+          // Double-check form doesn't point to rewards
+          const formAction = form.getAttribute('action') || '';
+          if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+            logEvent('search', 'Form action points to rewards, using direct navigation instead');
+            isSearching = false;
+            window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+            return;
+          }
+          isSearching = false; // Reset flag before navigation
+          form.submit();
+        } else {
+          isSearching = false;
+          // If no form found, try to find submit button or trigger search
+          const submitBtn = document.querySelector('input[type="submit"][name="search"], button[type="submit"], #search_icon, .b_searchboxSubmit');
+          if (submitBtn) {
+            // Check if submit button is in a form that points to rewards
+            const btnForm = submitBtn.closest('form');
+            if (btnForm) {
+              const formAction = btnForm.getAttribute('action') || '';
+              if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+                logEvent('search', 'Submit button form points to rewards, using direct navigation instead');
+                window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+                return;
+              }
+            }
+            submitBtn.click();
+          } else {
+            // Last resort: navigate directly but log it
+            logEvent('search', 'No form found, using direct navigation');
+            window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+          }
+        }
+      }).catch(() => { 
+        const form = input.closest("form"); 
+        if (form) {
+          // Check form action before submitting
+          const formAction = form.getAttribute('action') || '';
+          if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+            logEvent('search', 'Form action points to rewards, using direct navigation instead');
+            isSearching = false;
+            window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+          } else {
+            isSearching = false;
+            form.submit();
+          }
+        } else {
+          isSearching = false;
+          logEvent('search', 'Error in typing simulation, using direct navigation');
+          window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+        }
+      });
     } else {
-      maybeRotateUA();
-      // If browsing mode is enabled, after search we will optionally open a top result and dwell
-      window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(randomWord)}`;
+      // No input found - this shouldn't happen on Bing, but handle gracefully
+      // Try one more time to find the input after a short delay (page might still be loading)
+      if (rewardsIframesFound > 0) {
+        logEvent('search', `No main input found (${rewardsIframesFound} rewards iframe(s) detected), retrying after delay`);
+      } else {
+        logEvent('search', 'No search input found, retrying after delay');
+      }
+      const retryWord = randomWord; // Capture for retry
+      const retryRewardsCount = rewardsIframesFound; // Capture for retry
+      // Reset isSearching flag before scheduling retry to allow retry to proceed
+      // The retry will set it again when it actually starts searching
+      isSearching = false;
+      setTimeout(() => {
+        if (state.running && !isSearching) {
+          // Retry finding input with same helper function logic (excluding rewards iframes)
+          let retryInput = null;
+          const retryInputs = document.querySelectorAll("input[name='q']");
+          for (const inp of retryInputs) {
+            // Use the same helper functions to check
+            if (isInMainDocument(inp) && isNotInRewardsIframe(inp) && inp.offsetParent !== null) {
+              const rect = inp.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0 && rect.width < window.innerWidth) {
+                const style = window.getComputedStyle(inp);
+                if (style.display !== 'none' && style.visibility !== 'hidden') {
+                  // Check form action
+                  const form = inp.closest('form');
+                  if (!form || (!form.getAttribute('action')?.includes('rewards.bing.com') && !form.getAttribute('action')?.includes('rewards.microsoft.com'))) {
+                    retryInput = inp;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          if (retryInput) {
+            logEvent('search', 'Found input on retry, proceeding');
+            isSearching = true; // Set flag when actually starting the retry search
+            maybeRotateUA();
+            simulateTypingInto(retryInput, retryWord).then(() => {
+              const form = retryInput.closest("form");
+              if (form) {
+                // Check form action before submitting
+                const formAction = form.getAttribute('action') || '';
+                if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+                  logEvent('search', 'Retry form action points to rewards, using direct navigation instead');
+                  isSearching = false;
+                  window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(retryWord)}`;
+                  return;
+                }
+                isSearching = false;
+                form.submit();
+              } else {
+                isSearching = false;
+                const submitBtn = document.querySelector('input[type="submit"][name="search"], button[type="submit"], #search_icon, .b_searchboxSubmit');
+                if (submitBtn) {
+                  // Check if submit button is in a form that points to rewards
+                  const btnForm = submitBtn.closest('form');
+                  if (btnForm) {
+                    const formAction = btnForm.getAttribute('action') || '';
+                    if (formAction.includes('rewards.bing.com') || formAction.includes('rewards.microsoft.com')) {
+                      logEvent('search', 'Retry submit button form points to rewards, using direct navigation instead');
+                      window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(retryWord)}`;
+                      return;
+                    }
+                  }
+                  submitBtn.click();
+                } else {
+                  logEvent('search', 'No form or submit button, using direct navigation');
+                  window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(retryWord)}`;
+                }
+              }
+            }).catch(() => {
+              isSearching = false;
+              logEvent('search', 'Error in retry typing, using direct navigation');
+              window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(retryWord)}`;
+            });
+          } else {
+            // Last resort: direct navigation (but log it and warn about iframes)
+            if (retryRewardsCount > 0) {
+              logEvent('search', `WARNING: No input found after retry, using direct navigation while ${retryRewardsCount} rewards iframe(s) present`);
+            } else {
+              logEvent('search', 'No search input found after retry, using direct navigation');
+            }
+            maybeRotateUA();
+            isSearching = false;
+            window.location.href = `https://www.bing.com/search?q=${encodeURIComponent(retryWord)}`;
+          }
+        } else {
+          // State changed or already searching, don't proceed
+          if (!state.running) {
+            logEvent('search', 'Retry cancelled - automation stopped');
+          } else if (isSearching) {
+            logEvent('search', 'Retry cancelled - search already in progress');
+          }
+        }
+      }, 1000);
+      return; // Exit early, retry will handle the search
     }
 
     // Note: Timer will be set by checkAndResume() after page navigation completes
@@ -735,6 +1322,22 @@
       const ok = confirm('Manual start is enabled. Confirm to start automation.');
       if (!ok) return;
     }
+    
+    // Reset all flags
+    isSearching = false;
+    isResuming = false;
+    browsingActive = false;
+    
+    // Clear any existing timers
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    
     state.running = true;
     state.count = 0;
     saveState();
@@ -745,8 +1348,19 @@
 
   function stopAutomation() {
     state.running = false;
+    isSearching = false;
+    isResuming = false;
+    browsingActive = false;
+    pausedByVisibility = false;
+    if (visibilityResumeTimer) {
+      clearTimeout(visibilityResumeTimer);
+      visibilityResumeTimer = null;
+    }
     clearTimeout(timerId);
+    timerId = null;
     clearInterval(countdownInterval);
+    countdownInterval = null;
+    nextDelay = 0;
     saveState();
     updateBadge();
     showNotification("⏹️ Automation stopped by user.", 2500);
@@ -754,33 +1368,186 @@
 
   // Resume if already running - check if we're on a search results page
   function checkAndResume() {
+    // Guard against concurrent execution (but allow retry after a short delay)
+    if (isResuming) {
+      logEvent('resume', 'Already resuming, skipping');
+      return;
+    }
+
+    // Only run on Bing pages
+    if (!location.hostname.includes('bing.com')) {
+      logEvent('resume', 'Not on Bing page');
+      return;
+    }
+
+    // Don't resume if already searching (but this should be false after navigation)
+    if (isSearching) {
+      logEvent('resume', 'Search in progress, will retry');
+      // Retry after a short delay
+      setTimeout(() => {
+        if (state.running && !isSearching) checkAndResume();
+      }, 500);
+      return;
+    }
+
+    // Don't resume if browsing mode is active (but allow retry)
+    if (browsingActive) {
+      logEvent('resume', 'Browsing active, will retry');
+      setTimeout(() => {
+        if (state.running && !browsingActive) checkAndResume();
+      }, 1000);
+      return;
+    }
+
+    // Check if we're in an overlay - try to close it first
+    if (isInOverlay()) {
+      logEvent('resume', 'Overlay detected, attempting to close');
+      if (closeOverlays()) {
+        // Retry after overlay closes
+        setTimeout(() => {
+          if (state.running && !isInOverlay()) checkAndResume();
+        }, 500);
+        return;
+      }
+      // If we can't close it, still try to resume (overlay might not block)
+    }
+
+    // Check if automation should be running
+    if (!state.running) {
+      logEvent('resume', 'Automation not running');
+      return;
+    }
+
+    isResuming = true;
+
+    // Safety: Reset isResuming after 5 seconds if something goes wrong
+    const safetyTimeout = setTimeout(() => {
+      if (isResuming && !timerId) {
+        logEvent('resume', 'Safety timeout - resetting isResuming flag');
+        isResuming = false;
+      }
+    }, 5000);
+
     // Check if we're on a search results page (has ?q= parameter)
-    const isSearchResultsPage = location.hostname.includes('bing.com') && /[?&]q=/.test(location.search);
+    const isSearchResultsPage = /[?&]q=/.test(location.search);
     
-    if (state.running && isSearchResultsPage) {
+    if (isSearchResultsPage) {
       // We're on a search results page and automation is running
+      // Clear any existing timer first
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
+      
       // Calculate delay and continue
-      let delay = randInt(minDelay, maxDelay);
+      let delay = randInt(CONFIG.minDelay, CONFIG.maxDelay);
       if (CONFIG.spreadMode) {
-        delay += randInt(Math.max(minDelay, 60000), Math.max(maxDelay, 120000));
+        delay += randInt(Math.max(CONFIG.minDelay, 60000), Math.max(CONFIG.maxDelay, 120000));
       }
       showNotification("🔄 Continuing automation...", 2500);
+      logEvent('resume', 'Setting timer for next search: ' + delay + 'ms');
       startCountdown(Math.floor(delay / 1000));
-      timerId = setTimeout(doSearch, delay);
-    } else if (state.running && !isSearchResultsPage) {
+      timerId = setTimeout(() => {
+        clearTimeout(safetyTimeout);
+        isResuming = false;
+        if (state.running) {
+          doSearch();
+        } else {
+          logEvent('resume', 'Timer fired but automation stopped');
+        }
+      }, delay);
+    } else {
       // We're on the home page and automation is running, start immediately
+      clearTimeout(safetyTimeout);
       showNotification("🔄 Resuming automation...", 2500);
+      logEvent('resume', 'On home page, starting search immediately');
+      isResuming = false;
       doSearch();
     }
   }
 
-  // Resume if already running
-  checkAndResume();
-  
-  // Also check after page load (in case of slow navigation)
-  window.addEventListener('load', () => {
-    setTimeout(checkAndResume, 500);
-  });
+  // Resume if already running - multiple strategies to ensure it works
+  function attemptResume() {
+    // Only attempt if automation is running
+    if (!state.running) {
+      return;
+    }
+
+    // Try immediately if DOM is ready
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(checkAndResume, 200);
+    } else {
+      // Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', () => {
+          setTimeout(checkAndResume, 200);
+        }, { once: true });
+      }
+    }
+    
+    // Also try after full page load
+    if (document.readyState !== 'complete') {
+      window.addEventListener('load', () => {
+        setTimeout(checkAndResume, 500);
+      }, { once: true });
+    }
+    
+    // Use MutationObserver to detect when search results are loaded
+    if (location.hostname.includes('bing.com') && /[?&]q=/.test(location.search)) {
+      const observer = new MutationObserver((mutations) => {
+        // Check if search results container exists
+        const resultsContainer = document.querySelector('#b_results, .b_results, #b_content');
+        if (resultsContainer && state.running && !timerId && !isResuming) {
+          logEvent('resume', 'Search results detected via MutationObserver');
+          observer.disconnect();
+          setTimeout(checkAndResume, 300);
+        }
+      });
+      
+      // Start observing
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+      
+      // Disconnect after 10 seconds to avoid memory leaks
+      setTimeout(() => {
+        observer.disconnect();
+      }, 10000);
+    }
+    
+    // Fallback: check periodically if automation should be running
+    // This ensures we catch cases where event listeners might miss
+    let retryCount = 0;
+    const maxRetries = 15;
+    const retryInterval = setInterval(() => {
+      retryCount++;
+      if (retryCount > maxRetries) {
+        clearInterval(retryInterval);
+        return;
+      }
+      
+      // Only retry if automation is running but no timer is set
+      if (state.running && !timerId && !isResuming && !isSearching && !browsingActive) {
+        const isSearchResultsPage = location.hostname.includes('bing.com') && /[?&]q=/.test(location.search);
+        if (isSearchResultsPage) {
+          logEvent('resume', 'Fallback retry attempt ' + retryCount);
+          checkAndResume();
+          clearInterval(retryInterval);
+        } else if (!isSearchResultsPage && state.running) {
+          // On home page, start immediately
+          logEvent('resume', 'On home page, starting search');
+          checkAndResume();
+          clearInterval(retryInterval);
+        }
+      } else if (!state.running) {
+        clearInterval(retryInterval);
+      }
+    }, 1000);
+  }
+
+  // Start resume attempts
+  attemptResume();
 
   // Browsing mode behavior: if enabled and this is a bing search results page
   (function setupBrowsingHook() {
@@ -795,14 +1562,37 @@
     // and ensure automation is running
     if (!state.running) return;
 
+    // Don't browse if already browsing or searching
+    if (browsingActive || isSearching) return;
+
+    // Don't browse if in overlay
+    if (isInOverlay()) return;
+
     // Run after short delay to allow results to render
     setTimeout(() => {
+      // Double-check conditions before proceeding
+      if (!state.running || browsingActive || isSearching || isInOverlay()) {
+        return;
+      }
+
       try {
+        browsingActive = true;
+        
         // pick first organic result anchor
         const selectors = ['#b_results .b_algo a', '.b_algo a'];
         let anchor = null;
-        for (const s of selectors) { const el = document.querySelector(s); if (el) { anchor = el; break; } }
-        if (!anchor) { logEvent('browse', 'no-anchor-found'); return; }
+        for (const s of selectors) { 
+          const el = document.querySelector(s); 
+          if (el && el.offsetParent !== null) { // Check if visible
+            anchor = el; 
+            break; 
+          } 
+        }
+        if (!anchor) { 
+          browsingActive = false;
+          logEvent('browse', 'no-anchor-found'); 
+          return; 
+        }
 
         // open link in same tab (simulate click)
         logEvent('browse', 'opening first result');
@@ -811,9 +1601,26 @@
         // dwell for randomized seconds then go back
         const dwell = randInt(CONFIG.browseDwellMin, CONFIG.browseDwellMax) * 1000;
         setTimeout(() => {
-          try { history.back(); logEvent('browse', 'returned after dwell'); } catch (e) { logEvent('browse', 'return-failed'); }
+          try { 
+            if (state.running) {
+              history.back(); 
+              logEvent('browse', 'returned after dwell');
+              // Reset browsing flag after a delay to allow navigation
+              setTimeout(() => {
+                browsingActive = false;
+              }, 1000);
+            } else {
+              browsingActive = false;
+            }
+          } catch (e) { 
+            browsingActive = false;
+            logEvent('browse', 'return-failed:' + e.message); 
+          }
         }, dwell);
-      } catch (e) { logEvent('browse', 'error:' + e.message); }
+      } catch (e) { 
+        browsingActive = false;
+        logEvent('browse', 'error:' + e.message); 
+      }
     }, randInt(1200, 2600));
   })();
 
@@ -828,5 +1635,17 @@
   });
 
   showNotification("🎛️ Bing Automation ready. Ctrl+Shift+C to start, Ctrl+Shift+X to stop.");
+
+  // Final fallback: If automation is running, ensure we attempt to resume
+  // This catches any edge cases where the normal resume mechanisms might fail
+  if (state.running && location.hostname.includes('bing.com')) {
+    // Give the page a moment to fully load, then check
+    setTimeout(() => {
+      if (state.running && !timerId && !isResuming) {
+        logEvent('resume', 'Final fallback - attempting resume');
+        checkAndResume();
+      }
+    }, 2000);
+  }
 
 })();
