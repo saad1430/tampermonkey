@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.6.6
+// @version      1.7.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -15,6 +15,8 @@
 // @match        https://trakt.tv/shows/*
 // @match        https://app.trakt.tv/movies/*
 // @match        https://app.trakt.tv/shows/*
+// @match        https://app.trakt.tv/shows/*/seasons/*
+// @match        https://app.trakt.tv/shows/*/seasons/*/episodes/*
 // @match        https://yts.lt/movies/*
 // @match        https://yts.bz/movies/*
 // @match        https://yts.mx/movies/*
@@ -26,6 +28,8 @@
 // @grant        GM_deleteValue
 // @grant        GM_setClipboard
 // @grant        GM_addStyle
+// @grant        GM_xmlhttpRequest
+// @connect      api.themoviedb.org
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -54,7 +58,6 @@
     enableTrailerAutoPlay: false,    // auto-play trailer when opened
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true,        // fetch + display MPAA/TV rating
-    useOldTraktUI: true,             // redirect to old trakt UI from new one
     enableTransparencyMode: true     // use transparency mode for modals/panels
   };
 
@@ -73,6 +76,7 @@
       <li>Replaced various streaming sites with new ones</li>
       <li>Added CineSrc.st to the list of streaming sites</li>
       <li>Added ShuttleTV to the list of streaming sites</li>
+      <li>Full support for Trakt v3 on <code>app.trakt.tv</code></li>
     </ul>
   `;
 
@@ -171,7 +175,20 @@
   .tmdb-announcement-box {border-radius: 12px;padding: 20px 24px;width: min(90vw, 450px);box-shadow: 0 0 30px rgba(0,0,0,0.5);position: relative;animation: fadeIn 0.25s ease-out;}
   .tmdb-announcement-close {position: absolute;right: 10px;top: 8px;background: rgba(255,255,255,0.1);border: none;color: #fff;border-radius: 4px;padding: 4px 8px;cursor: pointer;}
   .tmdb-announcement-content {margin-top: 10px;font-size: 15px;}
-  @keyframes fadeIn {from { opacity: 0; transform: scale(0.95); }to { opacity: 1; transform: scale(1); }}
+    @keyframes fadeIn {from { opacity: 0; transform: scale(0.95); }to { opacity: 1; transform: scale(1); }}
+    /* Trakt v3: our summary-bar node is outside Svelte scope, so UA button styles win — match native ghost actions */
+    #tmdb-trakt-summary-play {
+      background: transparent !important;
+      background-color: transparent !important;
+      color: inherit !important;
+      border: none !important;
+      box-shadow: none !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+    }
+    #tmdb-trakt-summary-play path {
+      fill: currentColor !important;
+    }
   `);
 
   /* ----------------------------------------------------
@@ -192,6 +209,45 @@
 
   let currentKeyIndex = 0;
 
+  function getGmXhr() {
+    if (typeof GM_xmlhttpRequest === 'function') return GM_xmlhttpRequest;
+    if (typeof GM !== 'undefined' && typeof GM.xmlHttpRequest === 'function') {
+      return (opts) => GM.xmlHttpRequest(opts);
+    }
+    return null;
+  }
+
+  /** TMDb JSON GET via GM_xmlhttpRequest when available — bypasses page CSP (e.g. app.trakt.tv blocks fetch to api.themoviedb.org). */
+  function tmdbApiGetJson(url) {
+    const xhr = getGmXhr();
+    if (xhr) {
+      return new Promise((resolve, reject) => {
+        xhr({
+          method: 'GET',
+          url,
+          timeout: 45000,
+          onload(resp) {
+            if (resp.status < 200 || resp.status >= 300) {
+              reject(new Error(`TMDb HTTP ${resp.status}`));
+              return;
+            }
+            try {
+              resolve(JSON.parse(resp.responseText || '{}'));
+            } catch (e) {
+              reject(e);
+            }
+          },
+          onerror() { reject(new Error('TMDb network error')); },
+          ontimeout() { reject(new Error('TMDb request timeout')); },
+        });
+      });
+    }
+    return fetch(url).then((r) => {
+      if (!r.ok) throw new Error(`TMDb HTTP ${r.status}`);
+      return r.json();
+    });
+  }
+
   /* ----------------------------------------------------
    * Env & Query Helpers (kept from original)
    * -------------------------------------------------- */
@@ -201,7 +257,6 @@
   const isDuckDuckGo = hostname.includes('duckduckgo.com');
   const isImdb = hostname.includes('imdb.com');
   const isTrakt = hostname.includes('trakt.tv');
-  const isNewTrakt = hostname.includes('app.trakt.tv');
   const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.bz') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
 
   function isSearch() {
@@ -337,13 +392,12 @@
           ${checkbox('enableTorrentSiteShortcuts', 'Show torrent sites', SETTINGS.enableTorrentSiteShortcuts)}
           ${checkbox('enableYtsTorrents', 'Fetch YTS torrents for movies', SETTINGS.enableYtsTorrents)}
           ${checkbox('enableStremioLink', 'Show “Open in Stremio” link', SETTINGS.enableStremioLink)}
-          ${checkbox('enableTraktLink', 'Show Trakt link', SETTINGS.enableTraktLink)}
+          ${checkbox('enableTraktLink', 'Show Trakt (app.trakt.tv) links', SETTINGS.enableTraktLink)}
           ${checkbox('enableEpisodeSelection', 'Allow changing episode number when playing TV', SETTINGS.enableEpisodeSelection)}
           ${checkbox('enableTrailerButton', 'Show "Watch trailer" button', SETTINGS.enableTrailerButton)}
           ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
-          ${checkbox('useOldTraktUI', 'Use old Trakt UI (new one will be compatible soon)', SETTINGS.useOldTraktUI)}
           ${checkbox('enableTransparencyMode', 'Enable transparency mode for modals/panels', SETTINGS.enableTransparencyMode)}
 
           <div class="full">
@@ -545,6 +599,37 @@
   /* ----------------------------------------------------
    * UI: Info Box Renderer (kept, now conditional by settings)
    * -------------------------------------------------- */
+  /** Trakt v3 uses /movies/slug-year?mode=media and /shows/slug?season=n&mode=media (not /tv or IMDb search). */
+  function slugifyForTraktPath(str) {
+    const s = String(str || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[:'’.,!?&()[\]{}]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    return s || 'title';
+  }
+
+  function buildTraktAppUrls(vidType, title, date, seasonNumber) {
+    const base = slugifyForTraktPath(title);
+    const yearMatch = String(date).match(/^(\d{4})/);
+    const year = yearMatch ? yearMatch[1] : '';
+    const searchQ = `https://app.trakt.tv/search?q=${encodeURIComponent(title.trim() + (year ? ` ${year}` : ''))}`;
+    if (vidType === 'movie') {
+      const slug = year ? `${base}-${year}` : base;
+      return {
+        direct: `https://app.trakt.tv/movies/${slug}?mode=media`,
+        search: searchQ+`&m=movie`,
+      };
+    }
+    const sn = Number.isFinite(Number(seasonNumber)) && Number(seasonNumber) > 0 ? Number(seasonNumber) : 1;
+    return {
+      direct: `https://app.trakt.tv/shows/${base}?season=${sn}&mode=media`,
+      search: searchQ+`&m=show`,
+    };
+  }
+
   function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
@@ -586,6 +671,8 @@
       showNotification('No Results found!'); hideButton(); return;
     }
 
+    const traktUrls = SETTINGS.enableTraktLink ? buildTraktAppUrls(vidType, title, date, season_number) : null;
+
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
     container.innerHTML = `
@@ -601,8 +688,9 @@
           <strong>IMDb ID:</strong>
           <span style="color:black;background-color:rgb(226,182,22);" class="tmdb-copy" id="imdb-id" title="Click to copy">${imdb || ''}</span>
           ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(IMDb ↗)</a>
-                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide ↗)</a>
-                    ${SETTINGS.enableTraktLink ? `<a href="https://trakt.tv/search/imdb/${imdb}" target="_blank" style="color:#ff6f00;font-weight:bold;margin-left:6px;">(Trakt ↗)</a>` : ''}` : ''}
+                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide ↗)</a>` : ''}
+                    ${traktUrls ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:bold;">(Trakt ↗)</a>
+                    <a href="${traktUrls.search}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
         </div>
         ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="stremio://detail/${vidType}/${imdb}" style="color:#1bb8d9;font-weight:bold;">Open in Stremio ↗</a></div>` : ''}
 
@@ -704,8 +792,7 @@
             }
 
             const apiKey = getNextApiKey();
-            const resp = await fetch(`https://api.themoviedb.org/3/${kind}/${tmdbID}/videos?api_key=${apiKey}`);
-            const vids = await resp.json();
+            const vids = await tmdbApiGetJson(`https://api.themoviedb.org/3/${kind}/${tmdbID}/videos?api_key=${apiKey}`);
             const results = Array.isArray(vids.results) ? vids.results : [];
             // prefer official YouTube trailers, then any YouTube trailer
             let chosen = results.find(r => r.site === 'YouTube' && /trailer/i.test(r.type) && /official/i.test(r.name))
@@ -754,8 +841,7 @@
           playAnotherBtn.disabled = true; playAnotherBtn.textContent = 'Loading...';
           try {
             const apiKey = getNextApiKey();
-            const resp = await fetch(`https://api.themoviedb.org/3/tv/${tmdbID}?api_key=${apiKey}`);
-            const tvJson = await resp.json();
+            const tvJson = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tmdbID}?api_key=${apiKey}`);
             // exclude season 0 (specials) from the dropdown
             const seasons = Array.isArray(tvJson.seasons) ? tvJson.seasons.filter(s => typeof s.season_number === 'number' && s.season_number > 0) : [];
 
@@ -814,8 +900,7 @@
               updateLinksBtn.disabled = true; updateLinksBtn.textContent = 'Validating...';
               try {
                 const apiKey2 = getNextApiKey();
-                const sResp = await fetch(`https://api.themoviedb.org/3/tv/${tmdbID}/season/${seasonNum}?api_key=${apiKey2}`);
-                const sJson = await sResp.json();
+                const sJson = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tmdbID}/season/${seasonNum}?api_key=${apiKey2}`);
                 const episodes = Array.isArray(sJson.episodes) ? sJson.episodes.length : (sJson.episodes ? sJson.episodes.length : 0);
                 const total = episodes || parseInt(seasonSelect.selectedOptions[0].dataset.episodes) || 0;
                 if (total > 0 && (epNum < 1 || epNum > total)) { showNotification(`Selected episode out of range (1-${total})`); updateLinksBtn.disabled = false; updateLinksBtn.textContent = 'Update player links'; return; }
@@ -929,8 +1014,8 @@
       if (imdbId) { imdb_id = imdbId; }
       else {
         // fetch from TMDb external_ids endpoint
-        const imdbResp = await fetch(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
-        imdb_id = (await imdbResp.json()).imdb_id;
+        const extJson = await tmdbApiGetJson(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
+        imdb_id = extJson.imdb_id;
       }
 
       if (result.media_type === 'movie') {
@@ -974,8 +1059,7 @@
       const tmdbURL = `https://api.themoviedb.org/3/`;
       const url = `${tmdbURL}search/multi?api_key=${apiKey}&query=${encodeURIComponent(title)}`;
       try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await tmdbApiGetJson(url);
         if (data.results && data.results.length > 0) {
           const mediaResults = (data.results || []).filter(r => r && (r.media_type === 'movie' || r.media_type === 'tv'));
           let rendered = await tryRender(data.results[0]);
@@ -1118,14 +1202,12 @@
           console.warn('Failed to extract IMDb certification', err);
         }
       } else if (type === 'movie' && cert === '') {
-        const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/release_dates?api_key=${apiKey}`);
-        const json = await res.json();
+        const json = await tmdbApiGetJson(`https://api.themoviedb.org/3/movie/${id}/release_dates?api_key=${apiKey}`);
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
         cert = us?.release_dates?.[0]?.certification || '';
         if (!cert) { const tr = json.results?.find(r => r.iso_3166_1 === 'TR'); cert = tr?.rating || ''; }
       } else if (type === 'tv' && cert === '') {
-        const res = await fetch(`https://api.themoviedb.org/3/tv/${id}/content_ratings?api_key=${apiKey}`);
-        const json = await res.json();
+        const json = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${id}/content_ratings?api_key=${apiKey}`);
         const us = json.results?.find(r => r.iso_3166_1 === 'US');
         cert = us?.rating || '';
         if (!cert) { const tr = json.results?.find(r => r.iso_3166_1 === 'TR'); cert = tr?.rating || ''; }
@@ -1279,8 +1361,7 @@
       }
 
       const apiKey = getNextApiKey();
-      const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
-      const json = await res.json();
+      const json = await tmdbApiGetJson(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
       const data = json.movie_results?.[0] || json.tv_results?.[0];
 
       if (!data) {
@@ -1353,76 +1434,383 @@
 
   // simple cache for Trakt→TMDb lookups
   const traktCache = new Map();
+  let traktBindingsInstalled = false;
 
-  function traktHandler() {
-    let watchBtn = document.querySelector('a.btn-watch-now');
-    if (!watchBtn) {
-      console.warn('Trakt: Watch Now button not found.');
+  function scrapeTraktNextDataTmdb() {
+    const el = document.getElementById('__NEXT_DATA__');
+    if (!el?.textContent) return null;
+    try {
+      const data = JSON.parse(el.textContent);
+      const bag = [];
+      const walk = (node, depth) => {
+        if (depth > 30 || node === null || typeof node !== 'object') return;
+        const ids = node.ids;
+        if (ids && typeof ids.tmdb === 'number') {
+          let ty = null;
+          if (node.type === 'movie' || node.object_type === 'movie') ty = 'movie';
+          else if (node.type === 'show' || node.type === 'series' || node.object_type === 'show') ty = 'tv';
+          bag.push({ tmdb: String(ids.tmdb), type: ty });
+        }
+        if (Array.isArray(node)) {
+          node.forEach(x => walk(x, depth + 1));
+          return;
+        }
+        for (const k of Object.keys(node)) walk(node[k], depth + 1);
+      };
+      walk(data, 0);
+      if (!bag.length) return null;
+      const moviePath = /\/movies\//.test(location.pathname);
+      const showPath = /\/shows\//.test(location.pathname);
+      if (moviePath) {
+        const m = bag.find(x => x.type === 'movie') || bag[0];
+        return { tmdb: m.tmdb, type: 'movie' };
+      }
+      if (showPath) {
+        const t = bag.find(x => x.type === 'tv') || bag[0];
+        return { tmdb: t.tmdb, type: 'tv' };
+      }
+      const x = bag.find(b => b.type) || bag[0];
+      return { tmdb: x.tmdb, type: x.type || 'movie' };
+    } catch (e) {
+      return null;
     }
-    if (watchBtn) {
-      showNotification('Trakt "Watch Now" button hijacked. Click to open overlay or use SHIFT+P on any supported site to open it.', 3000);
-    }
+  }
 
-    // capture optional season/episode if present in the TMDb URL
-    const tmdbHref = document.querySelector('a[href*="themoviedb.org/"]')?.href || '';
-    // support both /tv/123/5/11 and /tv/123/season/5/episode/11 forms
+  /** Resolve <a> URL — SvelteKit often exposes full href on the property before/without the attribute. */
+  function resolveTraktAnchorHref(a) {
+    if (!a || a.tagName !== 'A') return '';
+    try {
+      const prop = a.href;
+      if (prop && /imdb\.com\/title\/tt\d+/i.test(prop)) return prop;
+    } catch (e) { /* ignore */ }
+    const attr = (a.getAttribute('href') || '').trim();
+    if (!attr) return '';
+    try {
+      return new URL(attr, location.href).href;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** Trakt v3: IMDb is on <a class="… trakt-link" href="https://www.imdb.com/title/tt…"> inside .trakt-summary-ratings. */
+  function extractImdbFromTraktPage() {
+    const skipRx = /\/fullcredits|\/parentalguide|\/reviews\/?(\?|$)|\/news\/|\/soundtrack|\/technical|\/quotes|\/goofs|\/faq/i;
+    const fromHref = (href) => {
+      if (!href || skipRx.test(href)) return null;
+      const m = href.match(/imdb\.com\/title\/(tt\d+)/i);
+      return m ? m[1] : null;
+    };
+
+    const selectorGroups = [
+      'a.trakt-link[href*="imdb.com"]',
+      '.trakt-summary-ratings a[href*="imdb.com"]',
+      'rating a[href*="imdb.com"]',
+      'a[href*="imdb.com/title/"]',
+      'a[href*="/title/tt"]',
+    ];
+    const seen = new Set();
+    for (const sel of selectorGroups) {
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(sel);
+      } catch (e) {
+        continue;
+      }
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        if (seen.has(a)) continue;
+        seen.add(a);
+        const href = resolveTraktAnchorHref(a);
+        const id = fromHref(href);
+        if (id) return id;
+      }
+    }
+    for (const a of document.querySelectorAll('a.trakt-link, a[class*="trakt-link"]')) {
+      const href = resolveTraktAnchorHref(a);
+      const id = fromHref(href);
+      if (id) return id;
+    }
+    const htmlHay = document.documentElement?.innerHTML || '';
+    const hm = htmlHay.match(/imdb\.com\/title\/(tt\d+)/i);
+    if (hm && !skipRx.test(hm[0])) return hm[1];
+    return null;
+  }
+
+  function extractTraktPageIds() {
+    const imdb = extractImdbFromTraktPage();
+    let tmdbHref = '';
+    for (const a of document.querySelectorAll('a[href*="themoviedb.org"]')) {
+      const abs = a.href || '';
+      if (/\/movie\/\d+|\/tv\/\d+/i.test(abs)) {
+        tmdbHref = abs;
+        break;
+      }
+    }
     const tmdbMatch = tmdbHref.match(/\/(movie|tv)\/(\d+)(?:\/(?:(\d+)\/(\d+))|\/season\/(\d+)\/episode\/(\d+))?/);
-    const imdb = document.querySelector('a[href*="imdb.com/title/"]')?.href.match(/tt\d+/)?.[0] || null;
-    const type = tmdbMatch ? tmdbMatch[1] : null;
-    const tmdb = tmdbMatch ? tmdbMatch[2] : null;
-    // pick the correct capturing groups (3/4 for simple form, 5/6 for 'season/episode' form)
-    const tmdbSeason = tmdbMatch ? (tmdbMatch[3] ? parseInt(tmdbMatch[3], 10) : (tmdbMatch[5] ? parseInt(tmdbMatch[5], 10) : null)) : null;
-    const tmdbEpisode = tmdbMatch ? (tmdbMatch[4] ? parseInt(tmdbMatch[4], 10) : (tmdbMatch[6] ? parseInt(tmdbMatch[6], 10) : null)) : null;
+    let type = tmdbMatch ? tmdbMatch[1] : null;
+    let tmdb = tmdbMatch ? tmdbMatch[2] : null;
+    let tmdbSeason = tmdbMatch ? (tmdbMatch[3] ? parseInt(tmdbMatch[3], 10) : (tmdbMatch[5] ? parseInt(tmdbMatch[5], 10) : null)) : null;
+    let tmdbEpisode = tmdbMatch ? (tmdbMatch[4] ? parseInt(tmdbMatch[4], 10) : (tmdbMatch[6] ? parseInt(tmdbMatch[6], 10) : null)) : null;
 
-    if (!tmdb) {
-      console.warn('Trakt: TMDb id missing.');
-      return;
+    if (type === 'tv' || (!type && /\/shows\//.test(location.pathname))) {
+      const pm = location.pathname.match(/\/shows\/[^/]+\/seasons\/(\d+)(?:\/episodes\/(\d+))?/);
+      if (pm) {
+        if (tmdbSeason == null) tmdbSeason = parseInt(pm[1], 10);
+        if (tmdbEpisode == null && pm[2]) tmdbEpisode = parseInt(pm[2], 10);
+      }
     }
 
-    // Fallback keybind (Shift+P)
-    document.addEventListener('keydown', e => {
+    if (!tmdb || !type) {
+      const scraped = scrapeTraktNextDataTmdb();
+      if (scraped) {
+        tmdb = scraped.tmdb;
+        type = scraped.type;
+      }
+    }
+    if (tmdb && !type) type = /\/movies\//.test(location.pathname) ? 'movie' : 'tv';
+    if (type && !tmdb) type = null;
+
+    return { imdb, tmdb, type, season: tmdbSeason, episode: tmdbEpisode };
+  }
+
+  function findTraktWatchTrigger() {
+    const legacy = document.querySelector('a.btn-watch-now');
+    if (legacy) return legacy;
+    for (const a of document.querySelectorAll('a[href*="/watch"], a[href*="watchnow"], a[href*="watch-now"]')) {
+      if (a.offsetParent !== null || a.getClientRects().length) return a;
+    }
+    for (const btn of document.querySelectorAll('button, [role="button"], a[class*="button"], a.Button')) {
+      if (btn.id === 'tmdb-trakt-summary-play' || btn.id === 'tmdb-trakt-play') continue;
+      const t = (btn.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (t === 'watch' || t === 'watch now' || t.startsWith('watch on')) return btn;
+    }
+    return null;
+  }
+
+  /** Play triangle from Trakt’s trailer control (same path / fill as the site). */
+  function traktStylePlaySvgHtml() {
+    const trailer = document.querySelector('.trakt-summary-actions-bar a[aria-label="Trailer"]');
+    const paths = trailer?.querySelectorAll('svg path');
+    const playPath = paths?.length ? paths[paths.length - 1] : null;
+    const d = playPath?.getAttribute('d');
+    const inner = d && d.includes('17.5012') && d.includes('14.375')
+      ? playPath.outerHTML
+      : '<path d="M10.0013 14.375V5.625L17.5012 10L10.0013 14.375Z" fill="currentColor"></path>';
+    return `<svg width="16" height="16" viewBox="10.0013 5.625 7.4999 8.75" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${inner}</svg>`;
+  }
+
+  /** Play icon in .trakt-summary-actions-bar (same ghost styling as watchlist / trailer). */
+  function injectTraktSummaryPlayButton(onToggle) {
+    if (document.getElementById('tmdb-trakt-summary-play')) return true;
+    const bar = document.querySelector('.trakt-summary-actions-bar');
+    const track = bar?.querySelector('trakt-track-action');
+    if (!bar || !track) return false;
+
+    const btn = document.createElement('button');
+    btn.id = 'tmdb-trakt-summary-play';
+    btn.type = 'button';
+    btn.className = 'trakt-action-button trakt-button-link tmdb-trakt-summary-play';
+    btn.setAttribute('data-color', 'default');
+    btn.setAttribute('data-variant', 'primary');
+    btn.setAttribute('data-size', 'normal');
+    btn.setAttribute('data-style', 'ghost');
+    btn.setAttribute('aria-label', 'TMDb streaming links (toggle)');
+    btn.innerHTML = traktStylePlaySvgHtml();
+
+    track.insertAdjacentElement('afterend', btn);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggle();
+    }, true);
+    return true;
+  }
+
+  function scheduleTraktSummaryPlayButton(onToggle) {
+    let n = 0;
+    const max = 80;
+    const tick = () => {
+      if (document.getElementById('tmdb-trakt-summary-play')) return;
+      if (injectTraktSummaryPlayButton(onToggle)) return;
+      if (++n >= max) {
+        injectTraktFallbackPlayButton(onToggle);
+        return;
+      }
+      setTimeout(tick, 200);
+    };
+    tick();
+  }
+
+  function injectTraktFallbackPlayButton(onToggle) {
+    if (document.getElementById('tmdb-trakt-play')) return;
+    const hdr = document.querySelector('header')
+      || document.querySelector('main')
+      || document.body;
+    const b = document.createElement('button');
+    b.id = 'tmdb-trakt-play';
+    b.type = 'button';
+    b.textContent = '▶ Streaming links (TMDb)';
+    b.className = 'tmdb-btn primary';
+    b.style.cssText = 'margin:8px 12px;z-index:2147483000;position:relative;';
+    hdr.insertAdjacentElement('afterbegin', b);
+    b.addEventListener('click', (e) => { e.preventDefault(); onToggle(); });
+  }
+
+  function bindTraktOverlayToPage(ids) {
+    const payload = {
+      imdb: ids.imdb,
+      tmdb: ids.tmdb,
+      type: ids.type,
+      season: ids.season,
+      episode: ids.episode,
+    };
+    const toggleOverlay = () => {
+      const ov = document.querySelector('.tmdb-overlay');
+      if (ov) {
+        ov.remove();
+        return;
+      }
+      void triggerTraktOverlay(payload);
+    };
+
+    document.addEventListener('keydown', (e) => {
       if (e.shiftKey && e.key.toLowerCase() === 'p') {
-        triggerTraktOverlay({ imdb, tmdb, type, season: tmdbSeason, episode: tmdbEpisode });
+        const ov = document.querySelector('.tmdb-overlay');
+        if (ov) ov.remove();
+        else void triggerTraktOverlay(payload);
       }
     });
 
-    // Hijack Trakt modal trigger
-    watchBtn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      triggerTraktOverlay({ imdb, tmdb, type, season: tmdbSeason, episode: tmdbEpisode });
-    }, true);
+    scheduleTraktSummaryPlayButton(toggleOverlay);
+
+    const isAppTrakt = location.hostname.startsWith('app.');
+    const watchBtn = findTraktWatchTrigger();
+    if (!isAppTrakt && watchBtn) {
+      showNotification('Trakt “Watch” opens this script’s overlay; Shift+P toggles it.', 3500);
+      watchBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        void triggerTraktOverlay(payload);
+      }, true);
+    } else if (isAppTrakt) {
+      showNotification('▶ next to the watched checkmark toggles TMDb streaming links. Shift+P too.', 4500);
+    } else if (!watchBtn) {
+      showNotification('Use the top “Streaming links” button or Shift+P when the action bar is slow to load.', 4500);
+    }
+  }
+
+  function traktPageHandler() {
+    let traktMo = null;
+    const stopMo = () => { try { traktMo?.disconnect(); } catch (e) { /* ignore */ } };
+
+    const tryBind = () => {
+      if (traktBindingsInstalled) return true;
+      const ids = extractTraktPageIds();
+      if (!ids.imdb && (!ids.tmdb || !ids.type)) return false;
+      traktBindingsInstalled = true;
+      stopMo();
+      bindTraktOverlayToPage(ids);
+      return true;
+    };
+
+    let traktMoRaf = 0;
+    traktMo = new MutationObserver(() => {
+      if (traktMoRaf) return;
+      traktMoRaf = requestAnimationFrame(() => {
+        traktMoRaf = 0;
+        tryBind();
+      });
+    });
+    traktMo.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href'],
+    });
+    setTimeout(stopMo, 35000);
+
+    let tries = 0;
+    const maxTries = 45;
+    const tick = () => {
+      if (tryBind()) return;
+      if (++tries >= maxTries) {
+        stopMo();
+        document.addEventListener('keydown', (e) => {
+          if (!e.shiftKey || e.key.toLowerCase() !== 'p') return;
+          const ids = extractTraktPageIds();
+          if (ids.imdb || (ids.tmdb && ids.type)) void triggerTraktOverlay(ids);
+          else showNotification('No IMDb title link on this Trakt page yet — wait for the page to finish loading.');
+        });
+        showNotification('TMDb Enhancer: Waiting for Trakt’s IMDb link — try Shift+P shortly.', 5500);
+        return;
+      }
+      setTimeout(tick, 400);
+    };
+    tick();
   }
 
   async function triggerTraktOverlay({ imdb, tmdb, type, season = null, episode = null }) {
     if (document.querySelector('.tmdb-overlay')) return;
 
-    // cache key by TMDb id (include season/episode so different episode previews cache separately)
-    const cacheKey = `${type}:${tmdb}${season ? `:s${season}` : ''}${episode ? `:e${episode}` : ''}`;
-    if (traktCache.has(cacheKey)) {
-      console.log('Using cached TMDb data for', cacheKey);
-      return renderTraktOverlay(traktCache.get(cacheKey), season, episode);
-    }
-
     const apiKey = getNextApiKey();
     const tmdbBase = 'https://api.themoviedb.org/3';
-    try {
-      // main details
-      const res = await fetch(`${tmdbBase}/${type}/${tmdb}?api_key=${apiKey}`);
-      const data = await res.json();
+    let resolvedTmdb = tmdb;
+    let resolvedType = type;
+    let seasonUse = season;
+    let episodeUse = episode;
 
-      // external ids (for imdb)
+    if ((!resolvedTmdb || !resolvedType) && imdb) {
+      try {
+        const findJson = await tmdbApiGetJson(`${tmdbBase}/find/${encodeURIComponent(imdb)}?api_key=${apiKey}&external_source=imdb_id`);
+        const movie = findJson.movie_results?.[0];
+        const tv = findJson.tv_results?.[0];
+        const tvep = findJson.tv_episode_results?.[0];
+        if (movie) {
+          resolvedType = 'movie';
+          resolvedTmdb = String(movie.id);
+        } else if (tv) {
+          resolvedType = 'tv';
+          resolvedTmdb = String(tv.id);
+        } else if (tvep != null && tvep.show_id != null) {
+          resolvedType = 'tv';
+          resolvedTmdb = String(tvep.show_id);
+          if (seasonUse == null && tvep.season_number != null) seasonUse = tvep.season_number;
+          if (episodeUse == null && tvep.episode_number != null) episodeUse = tvep.episode_number;
+        } else {
+          showNotification('TMDb find: no movie/show match for this IMDb id.');
+          return;
+        }
+      } catch (e) {
+        console.error('Trakt IMDb→TMDb find failed:', e);
+        showNotification('Failed to look up title on TMDb from IMDb.');
+        return;
+      }
+    }
+
+    if (!resolvedTmdb || !resolvedType) {
+      showNotification('Need an IMDb title link on the Trakt page (or TMDb in the page) to load data.');
+      return;
+    }
+
+    const cacheKey = `${resolvedType}:${resolvedTmdb}${seasonUse != null ? `:s${seasonUse}` : ''}${episodeUse != null ? `:e${episodeUse}` : ''}`;
+    if (traktCache.has(cacheKey)) {
+      console.log('Using cached TMDb data for', cacheKey);
+      return renderTraktOverlay(traktCache.get(cacheKey), seasonUse, episodeUse);
+    }
+
+    try {
+      const data = await tmdbApiGetJson(`${tmdbBase}/${resolvedType}/${resolvedTmdb}?api_key=${apiKey}`);
+
       let imdb_id = imdb;
       if (!imdb_id) {
-        const extRes = await fetch(`${tmdbBase}/${type}/${tmdb}/external_ids?api_key=${apiKey}`);
-        imdb_id = (await extRes.json()).imdb_id || null;
+        const extJson = await tmdbApiGetJson(`${tmdbBase}/${resolvedType}/${resolvedTmdb}/external_ids?api_key=${apiKey}`);
+        imdb_id = extJson.imdb_id || null;
       }
-      data.media_type = type;
+      data.media_type = resolvedType;
       data.external_imdb = imdb_id;
 
-      // cache it (store the TMDb data; season/episode passed separately)
       traktCache.set(cacheKey, data);
-      renderTraktOverlay(data, season, episode);
+      renderTraktOverlay(data, seasonUse, episodeUse);
     } catch (err) {
       console.error('Trakt overlay error:', err);
       showNotification('Failed to fetch TMDb info.');
@@ -1452,33 +1840,6 @@
     const card = document.querySelector('.tmdb-info-card');
     if (card) overlay.querySelector('#tmdb-overlay-inner').appendChild(card);
     else overlay.remove();
-  }
-
-  /* ----------------------------------------------------
-  * Trakt New UI Handler
-  * -------------------------------------------------- */
-
-  function newTraktHandler() {
-    if (SETTINGS.useOldTraktUI) {
-      // If we're on the app.trakt.tv subdomain, redirect to the main trakt.tv by removing the "app." prefix
-      try {
-        const loc = window.location;
-        if (loc && loc.hostname && loc.hostname.startsWith('app.')) {
-          const newHost = loc.hostname.replace(/^app\./, '');
-          const newUrl = loc.protocol + '//' + newHost + loc.pathname + loc.search + loc.hash;
-          showNotification('Redirecting to old version of Trakt.tv (To disable this behavior, uncheck "Use old Trakt UI" in settings)', 2000);
-          setTimeout(() => {
-            window.location.href = newUrl;
-            return;
-          }, 2000);
-          // perform redirect and stop further execution
-          return;
-        }
-      } catch (e) {
-        console.warn('Failed to redirect Trakt new UI:', e);
-      }
-    }
-    showNotification('TMDb Enhancer: Trakt new UI detected. Underdevelopment, please wait!', 8000);
   }
 
   /* ----------------------------------------------------
@@ -1618,8 +1979,7 @@
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
     imdbHandler();
   } else if (isTrakt && SETTINGS.enableOnTraktPage) {
-    if (!isNewTrakt) traktHandler();
-    else newTraktHandler();
+    traktPageHandler();
   } else if (isYTS) {
     ytsHandler();
   }
