@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.6.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -65,9 +65,10 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Replaced Flixer with <a href="https://hexa.su" target="_blank">Hexa</a></li>
-      <li>Replaced VeloraTV with <a href="https://67movies.net" target="_blank">67movies</a></li>
-      <li>Removed SpencerDevs from the list of streaming sites</li>
+      <li>Replaced various streaming sites with new ones</li>
+      <li>Added CineSrc.st to the list of streaming sites</li>
+      <li>Added ShuttleTV to the list of streaming sites</li>
+      <li>Improved the links updating process</li>
     </ul>
   `;
 
@@ -362,6 +363,38 @@
     if (!isMedia && bingBlock?.innerText && /TV series|Movie|Episode/i.test(bingBlock.innerText)) isMedia = true;
   }
 
+  /** Rewrite season/episode in streaming URLs without changing path-vs-query style. */
+  function rewritePlayerLinkHref(href, tmdbID, s, e) {
+    if (!href || href.includes('themoviedb.org')) return href;
+    const id = String(tmdbID);
+    let h = href.replace(/\?\?+/g, '?');
+    let u;
+    try {
+      u = new URL(h);
+    } catch {
+      return href;
+    }
+    if (u.protocol === 'stremio:') return href;
+    const qs = u.searchParams;
+    if (qs.has('s') && qs.has('e')) {
+      qs.set('s', String(s));
+      qs.set('e', String(e));
+      return u.toString();
+    }
+    const idEsc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pathRe = new RegExp(`(/${idEsc})/(\\d+)/(\\d+)(?=(?:/|$))`);
+    if (pathRe.test(u.pathname)) {
+      u.pathname = u.pathname.replace(pathRe, `$1/${s}/${e}`);
+      return u.toString();
+    }
+    const suffix = `/${id}`;
+    if (u.pathname.endsWith(suffix)) {
+      u.pathname = `${u.pathname}/${s}/${e}`;
+      return u.toString();
+    }
+    return h;
+  }
+
   /* ----------------------------------------------------
    * UI: Info Box Renderer (kept, now conditional by settings)
    * -------------------------------------------------- */
@@ -430,11 +463,12 @@
         <div style="margin-top:6px;">
           <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (recommended) ↗</a><br/>
           <a href="https://cinemaos.tech/player/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.tech (fastest) ↗</a><br/>
+          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CineSrc.st ↗</a>
+          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(Download)</a><br/>
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
-          <a href="https://111movies.com/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.com ↗</a><br/>
-          <a href="https://vidora.su/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Vidora.su ↗</a><br/>
+          <a href="https://111movies.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.net ↗</a><br/>
           <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidFast.pro ↗</a><br/>
           <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Smashy.stream ↗</a><br/>
         </div>` : ''}
@@ -442,14 +476,15 @@
         ${SETTINGS.enableFrontendLinks ? `
         <div style="margin-top:6px;">
           <strong>Watch on frontends:</strong><br/>
-          <a href="https://www.cineby.gd/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby.gd</a>
-          <a href="https://www.cineby.gd/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.live ↗</a>
+          <a href="https://www.cineby.sc/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby</a>
+          <a href="https://www.cineby.sc/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS ↗</a>
           <a href="https://cinemaos.live/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Hexa.su ↗</a>
-          <a href="https://hexa.su/details/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VeloraTV.ru ↗</a><br/>
-          <a href="https://pstream.mov/media/tmdb-${vidType}-${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on PStream.mov ↗</a> ${vidType === "tv" ? "(Auto Episode Not Available)" : "(4K possible)"}<br/>
+          <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on ShuttleTV ↗</a><br/>
+          <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Hexa ↗</a>
+          <a href="https://hexa.su/details/${vidType}/${tmdbID}/" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 67Movies ↗</a><br/>
+          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on PStream ↗</a> ${vidType === "tv" ? "(Auto Episode Not Available, Playback will start from first episode)" : "(4K possible)"}<br/>
         </div>` : ''}
 
         ${html}
@@ -458,10 +493,10 @@
         <div style="margin-top:6px;">
           <strong>Search on Torrent Sites:</strong><br/>
           <a href="https://1337x.to/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">1337x.to ↗</a> -
-          <a href="https://1337x.to/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 1 ↗</a> -
+          <a href="https://1337x.st/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 1 ↗</a> -
           <a href="https://x1337x.cc/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 2 ↗</a><br/>
           ${eztv}
-          <a href="https://www.limetorrents.lol/search/${vidType1337}/${title}" target="_blank" style="color:#1bb8d9;font-weight:bold;">LimeTorrents.lol ↗</a><br/>
+          <a href="https://www.limetorrents.fun/search/${vidType1337}/${title}" target="_blank" style="color:#1bb8d9;font-weight:bold;">LimeTorrents.fun ↗</a><br/>
           <a href="https://thepiratebay.org/search.php?q=${title}&video=on&search=Pirate+Search&page=0" target="_blank" style="color:#1bb8d9;font-weight:bold;">ThePirateBay.org ↗</a><br/>
           <a href="https://extratorrent.st/search/?new=1&search=${title}&s_cat=${ET_cat}" target="_blank" style="color:#1bb8d9;font-weight:bold;">ExtraTorrent.st ↗</a><br/>
           <a href="https://rutor.is/search/${title}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Rutor.is ↗</a><br/>
@@ -646,18 +681,7 @@
                     let orig = a.dataset.originalHref;
                     if (!orig) { orig = a.getAttribute('href') || ''; a.dataset.originalHref = orig; }
                     if (!orig) return;
-                    let newHref = orig;
-                    newHref = newHref.replace('?s=1&e=1', `?s=${s}&e=${e}`);
-                    newHref = newHref.replace('&s=1&e=1', `&s=${s}&e=${e}`);
-                    newHref = newHref.replace(`${tmdbID}/1/1`, `${tmdbID}/${s}/${e}`);
-                    if (query) newHref = newHref.replace(`${tmdbID}${query}`, `${tmdbID}/${s}/${e}`);
-                    if (multiQuery) newHref = newHref.replace(`${tmdbID}${multiQuery}`, `${tmdbID}?s=${s}&e=${e}`);
-                    if (smashQuery) newHref = newHref.replace(`${tmdbID}${smashQuery}`, `${tmdbID}?s=${s}&e=${e}`);
-                    const tmdbPath = `/${tmdbID}`;
-                    if (newHref.includes(tmdbPath) && !newHref.includes(`${tmdbPath}/`) && !newHref.includes('themoviedb.org')) {
-                      newHref = newHref.replace(tmdbPath, `${tmdbPath}/${s}/${e}`);
-                    }
-                    a.setAttribute('href', newHref);
+                    a.setAttribute('href', rewritePlayerLinkHref(orig, tmdbID, s, e));
                   } catch (ex) { /* ignore individual anchor errors */ }
                 });
 
