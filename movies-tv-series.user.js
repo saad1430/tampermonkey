@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.6.1
+// @version      1.6.6
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
 // @match        https://www.google.com/search*
+// @match        https://google.com/search*
 // @match        https://www.bing.com/search*
+// @match        https://bing.com/search*
 // @match        https://www.imdb.com/title/*
 // @match        https://imdb.com/title/*
 // @match        https://trakt.tv/movies/*
@@ -24,6 +26,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_setClipboard
 // @grant        GM_addStyle
+// @run-at       document-idle
 // ==/UserScript==
 
 (async function () {
@@ -65,10 +68,11 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
+      <li>Fixed auto-detecting on Google and Bing</li>
+      <li>Improved the links updating process</li>
       <li>Replaced various streaming sites with new ones</li>
       <li>Added CineSrc.st to the list of streaming sites</li>
       <li>Added ShuttleTV to the list of streaming sites</li>
-      <li>Improved the links updating process</li>
     </ul>
   `;
 
@@ -207,20 +211,72 @@
   function getSearchQuery() {
     const params = new URLSearchParams(window.location.search);
     if (isGoogle) return params.get('q');
-    if (isBing) return params.get('q');
+    if (isBing) {
+      const fromQs = params.get('q') || params.get('pq');
+      if (fromQs && fromQs.trim()) return fromQs.trim();
+      try {
+        const hashQs = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const hq = hashQs.get('q');
+        if (hq && hq.trim()) return hq.trim();
+      } catch (e) { /* ignore */ }
+      const input = document.querySelector('input#sb_form_q, textarea#sb_form_q, input[name="q"], textarea[name="q"]');
+      const fromDom = input?.value?.trim();
+      if (fromDom) return fromDom;
+      return null;
+    }
     if (isDuckDuckGo) return params.get('q');
     return null;
   }
 
   function getInsertionPoint() {
-    if (isGoogle) return document.getElementById('search');
-    if (isBing) return document.querySelector('#b_results');
-    if (isDuckDuckGo) return document.querySelector('.results--main');
+    if (isGoogle) {
+      return document.getElementById('search')
+        || document.querySelector('form[role="search"]')?.closest('div')
+        || document.body;
+    }
+    if (isBing) {
+      return document.getElementById('b_content')
+        || document.querySelector('#b_content')
+        || document.querySelector('main[role="main"]')
+        || document.querySelector('#b_results')?.parentElement
+        || document.querySelector('#b_results')
+        || document.body;
+    }
+    if (isDuckDuckGo) return document.querySelector('.results--main') || document.body;
     return document.body;
   }
 
   const parent = getInsertionPoint();
   let cleanedQuery = null;
+
+  /** Live mount for SERP UI — Bing rebuilds #b_results; avoid inserting inside <ol id="b_results">. */
+  function getMountTarget() {
+    if (!isSearch()) return parent?.isConnected ? parent : document.body;
+    if (isBing) {
+      const u = document.getElementById('b_content')
+        || document.querySelector('#b_content')
+        || document.querySelector('main[role="main"]')
+        || document.querySelector('#b_results')?.parentElement
+        || document.querySelector('#b_results')
+        || (parent?.isConnected ? parent : null)
+        || document.body;
+      return u?.isConnected ? u : document.body;
+    }
+    if (isGoogle) {
+      const u = document.getElementById('search')
+        || document.querySelector('form[role="search"]')?.closest('div')
+        || (parent?.isConnected ? parent : null)
+        || document.body;
+      return u?.isConnected ? u : document.body;
+    }
+    if (isDuckDuckGo) {
+      const u = document.querySelector('.results--main')
+        || (parent?.isConnected ? parent : null)
+        || document.body;
+      return u?.isConnected ? u : document.body;
+    }
+    return document.body;
+  }
 
   if (isSearch()) {
     if (!parent) return;
@@ -347,20 +403,111 @@
   document.addEventListener('touchend', () => clearTimeout(touchTimer));
 
   /* ----------------------------------------------------
-   * Smart media detection (original logic retained)
+   * Smart media detection (SERP knowledge panels move often)
    * -------------------------------------------------- */
-  let isMedia = false;
-  if (isGoogle && SETTINGS.enableOnGooglePage) {
-    const rhsBlock = document.querySelector('#rhs');
-    if (rhsBlock && /IMDb|TV series|Movie|Episodes|Run time/i.test(rhsBlock.innerText)) isMedia = true;
-  } else if (isBing && SETTINGS.enableOnBingPage) {
-    const bingBlock = document.querySelector('.b_entityTP') || document.querySelector('.b_vList');
-    if (bingBlock) {
-      const links = bingBlock.querySelectorAll('a[href*="imdb.com"], a');
-      const foundMediaLink = Array.from(links).some(a => /imdb\.com|TV series|Movie|Episode|Run time|Rating|Release date/i.test(a.href + a.textContent));
-      if (foundMediaLink) isMedia = true;
+  function serpHasMovieTvJsonLd() {
+    const typeMatches = (typ) => {
+      if (!typ || typeof typ !== 'string') return false;
+      return /Movie|TVSeries|TelevisionSeries|TVEpisode|VideoObject|CreativeWorkSeason/i.test(typ)
+        || /schema\.org\/(Movie|TVSeries|TelevisionSeries|TVEpisode|VideoObject)/i.test(typ);
+    };
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return false;
+      if (Array.isArray(node)) return node.some(walk);
+      if (node['@graph']) return walk(node['@graph']);
+      const t = node['@type'];
+      const types = (Array.isArray(t) ? t : [t]).filter(Boolean);
+      if (types.some(typeMatches)) return true;
+      if (node.mainEntity && walk(node.mainEntity)) return true;
+      if (node.about && walk(node.about)) return true;
+      return false;
+    };
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      const raw = s.textContent?.trim();
+      if (!raw) continue;
+      try {
+        if (walk(JSON.parse(raw))) return true;
+      } catch (e) { /* malformed or trailing commas */ }
     }
-    if (!isMedia && bingBlock?.innerText && /TV series|Movie|Episode/i.test(bingBlock.innerText)) isMedia = true;
+    return false;
+  }
+
+  function serpHasSchemaMicrodata() {
+    return !!document.querySelector('[itemtype*="schema.org/Movie"], [itemtype*="schema.org/TVSeries"], [itemtype*="schema.org/TelevisionSeries"]');
+  }
+
+  /** Strong outbound links often present in film/TV entity cards (Bing/Google). */
+  function serpRootsContainMediaSiteLinks(rootSelectors) {
+    const anchorSel = [
+      'a[href*="imdb.com/title/"]',
+      'a[href*="themoviedb.org/movie/"]', 'a[href*="themoviedb.org/tv/"]',
+      'a[href*="rottentomatoes.com/m/"]', 'a[href*="rottentomatoes.com/tv/"]',
+      'a[href*="metacritic.com/movie/"]', 'a[href*="metacritic.com/tv/"]',
+      'a[href*="letterboxd.com/film/"]',
+    ].join(', ');
+    for (const sel of rootSelectors) {
+      const root = document.querySelector(sel);
+      if (root?.querySelector(anchorSel)) return true;
+    }
+    return false;
+  }
+
+  function scanGoogleForMediaHints() {
+    if (!isGoogle || !SETTINGS.enableOnGooglePage) return false;
+    if (serpHasMovieTvJsonLd()) return true;
+    if (serpHasSchemaMicrodata()) return true;
+    if (serpRootsContainMediaSiteLinks(['#search', '#rso', '#main', '#center_col', '#rhs', '#rhs_col'])) return true;
+    const imdbAnchors = '#search a[href*="imdb.com/title/"], #rso a[href*="imdb.com/title/"], #main a[href*="imdb.com/title/"], #center_col a[href*="imdb.com/title/"], #rhs a[href*="imdb.com/title/"], #rhs_col a[href*="imdb.com/title/"]';
+    if (document.querySelector(imdbAnchors)) return true;
+    const panelRe = /IMDb|TV series|TV show|Movie\b|Movies\b|Episodes|Episode\b|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b/i;
+    for (const sel of ['#rhs', '#rhs_col', '#center_col', '#rso']) {
+      const el = document.querySelector(sel);
+      if (el && panelRe.test(el.innerText)) return true;
+    }
+    const strictRe = /IMDb|TV series|TV show|Rotten Tomatoes|Metacritic|Directed by|Running time|Where to watch|Original release|Film series|\bEpisodes?\b.*\bSeason\b/i;
+    for (const sel of ['#main', '#search']) {
+      const el = document.querySelector(sel);
+      if (el && strictRe.test(el.innerText)) return true;
+    }
+    return false;
+  }
+
+  function scanBingForMediaHints() {
+    if (!isBing || !SETTINGS.enableOnBingPage) return false;
+    if (serpHasMovieTvJsonLd()) return true;
+    if (serpHasSchemaMicrodata()) return true;
+    const bingRoots = [
+      '#b_results', '#b_context', '#b_content', '#results', '#ajaxsrwrap',
+      'main[role="main"]', 'main', '[role="main"]',
+    ];
+    if (serpRootsContainMediaSiteLinks(bingRoots)) return true;
+
+    const imdbComposite = bingRoots.map(r => `${r} a[href*="imdb.com/title/"]`).join(', ');
+    if (document.querySelector(imdbComposite)) return true;
+
+    const panelRe = /IMDb|TV series|TV show|Movie\b|Movies\b|Episodes|Episode\b|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original release|Film series|\bSeasons?\s*\d|Watch on\b|Release date|Cast\b/i;
+    const panelSelectors = [
+      '.b_entityTP', '.b_vList', '#b_context', '.b_ans', '.b_canvas', '.b_slideexp',
+      '.scs_arw', '.rich_card', '.mcd', '.ec_item', '.entityContainer',
+      '.b_antiSideBleed', '.b_wpt_sec',
+    ];
+    for (const sel of panelSelectors) {
+      const el = document.querySelector(sel);
+      if (el && panelRe.test(el.innerText)) return true;
+    }
+
+    const strictRe = /IMDb|TV series|TV show|Rotten Tomatoes|Metacritic|Directed by|Running time|Where to watch|Original release|Film series|\bEpisodes?\b.*\bSeason\b|TV\s*program|Motion picture/i;
+    for (const sel of ['#b_results', '#b_content', '#ajaxsrwrap', 'main']) {
+      const el = document.querySelector(sel);
+      if (el && strictRe.test(el.innerText)) return true;
+    }
+    return false;
+  }
+
+  function serpLooksLikeMedia() {
+    if (isGoogle && SETTINGS.enableOnGooglePage) return scanGoogleForMediaHints();
+    if (isBing && SETTINGS.enableOnBingPage) return scanBingForMediaHints();
+    return false;
   }
 
   /** Rewrite season/episode in streaming URLs without changing path-vs-query style. */
@@ -503,7 +650,7 @@
         </div>` : ''}
       </div>`;
 
-    parent.prepend(container);
+    getMountTarget().prepend(container);
     hideButton();
 
     const toggleBtn = container.querySelector('#toggle-details-btn');
@@ -769,7 +916,7 @@
     const ytsAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
     try {
       // remove any existing info card before rendering the new one
-      const existing = parent.querySelector('.tmdb-info-card');
+      const existing = getMountTarget().querySelector('.tmdb-info-card');
       if (existing) existing.remove();
 
       const apiKey = getNextApiKey();
@@ -810,7 +957,17 @@
     }
   }
 
+  /** @returns {Promise<boolean>} true if a movie/TV info card was shown */
   async function fetchWithFallback(title, maxRetries = apiKeys.length) {
+    const tryRender = async (candidate) => {
+      try {
+        await processSearchResult(candidate);
+        return !!getMountTarget().querySelector('.tmdb-info-card');
+      } catch {
+        return false;
+      }
+    };
+
     let attempts = 0;
     while (attempts < maxRetries) {
       const apiKey = getNextApiKey();
@@ -820,25 +977,25 @@
         const response = await fetch(url);
         const data = await response.json();
         if (data.results && data.results.length > 0) {
-          // Always process the first result automatically
-          const res = data.results[0];
-          await processSearchResult(res);
+          const mediaResults = (data.results || []).filter(r => r && (r.media_type === 'movie' || r.media_type === 'tv'));
+          let rendered = await tryRender(data.results[0]);
+          if (!rendered && mediaResults.length > 0) {
+            rendered = await tryRender(mediaResults[0]);
+          }
+          if (!rendered) {
+            showNotification('No movie/TV card for this search.');
+            return false;
+          }
 
-          // If there are multiple results, show a "Change result" button on the details card
-          if (data.results.length > 1 && SETTINGS.enableChangeResultButton) {
+          if (mediaResults.length > 1 && SETTINGS.enableChangeResultButton) {
             try {
-              // only allow movies and tv shows in the change-result selector (exclude person entries)
-              const results = (data.results || []).filter(r => r && (r.media_type === 'movie' || r.media_type === 'tv'));
-              if (!results || results.length === 0) { /* nothing to show */ return; }
-
-              // helper: attach a change-result button to the current info card (if present)
+              const results = mediaResults;
               function attachChangeButtonToCurrentCard() {
                 try {
-                  const infoCard = parent.querySelector('.tmdb-info-card');
+                  const infoCard = getMountTarget().querySelector('.tmdb-info-card');
                   if (!infoCard) return;
                   const detailsDiv = infoCard.querySelector('#tmdb-details');
                   if (!detailsDiv) return;
-                  // don't duplicate button
                   if (detailsDiv.querySelector('#tmdb-change-result-btn')) return;
 
                   const changeBtn = document.createElement('button');
@@ -852,9 +1009,7 @@
                   if (stremioWrapper) detailsDiv.insertBefore(changeBtn, stremioWrapper);
                   else detailsDiv.appendChild(changeBtn);
 
-                  // show an in-card selector when clicked
                   changeBtn.addEventListener('click', () => {
-                    // toggle existing selector inside this details div
                     const existingSel = detailsDiv.querySelector('.tmdb-result-selector');
                     if (existingSel) { existingSel.remove(); return; }
 
@@ -879,7 +1034,6 @@
                       const chosen = results[idx];
                       selWrap.remove();
                       await processSearchResult(chosen);
-                      // after re-rendering, attach the change button again into the new card
                       attachChangeButtonToCurrentCard();
                     });
 
@@ -889,22 +1043,20 @@
                 } catch (innerErr) { /* ignore attach errors */ }
               }
 
-              // initial attach into the currently rendered card
               attachChangeButtonToCurrentCard();
             } catch (e) { /* ignore selector injection errors */ }
           }
-          return;
-        } else {
-          showNotification('No results found. Rotating API key...');
-          attempts++;
+          return true;
         }
+        showNotification('No results found. Rotating API key...');
+        attempts++;
       } catch (err) {
         showNotification(`Fetch error: ${err.message}`);
         attempts++;
       }
     }
     showNotification('TMDb API failed or no results. Try refining your search?');
-    return null;
+    return false;
   }
 
   function buildTorrentLinks(torrents, title_long) {
@@ -988,6 +1140,42 @@
   function hideButton() {
     const btn = document.getElementById('tmdb-button');
     if (btn) btn.style.display = 'none';
+  }
+
+  function ensureSerpManualButton() {
+    const mount = getMountTarget();
+    if (!mount?.isConnected) return;
+    if (mount.querySelector('.tmdb-info-card')) return;
+    const existing = document.getElementById('tmdb-button');
+    if (existing) {
+      if (!existing.isConnected || existing.parentElement !== mount) {
+        mount.prepend(existing);
+      }
+      existing.disabled = false;
+      existing.style.display = 'block';
+      if (isBing) {
+        existing.style.position = 'relative';
+        existing.style.zIndex = '2147483000';
+        existing.style.margin = '12px 0';
+      }
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.textContent = 'Search TMDb Info';
+    btn.id = 'tmdb-button';
+    btn.style.display = 'block';
+    if (isBing) {
+      btn.style.position = 'relative';
+      btn.style.zIndex = '2147483000';
+      btn.style.margin = '12px 0';
+    }
+    btn.onclick = () => {
+      void (async () => {
+        const ok = await fetchWithFallback(cleanedQuery);
+        if (!ok) ensureSerpManualButton();
+      })();
+    };
+    mount.prepend(btn);
   }
 
   /* ----------------------------------------------------
@@ -1372,14 +1560,60 @@
   * Action time
   * -------------------------------------------------- */
   if (isSearch()) {
-    if (SETTINGS.autoDetectOnSERP && isMedia) {
-      fetchWithFallback(cleanedQuery);
+    let serpAutoFetchTriggered = false;
+    async function runSerpAutoFetchOnce() {
+      if (serpAutoFetchTriggered || !SETTINGS.autoDetectOnSERP) return;
+      if (!serpLooksLikeMedia()) return;
+      serpAutoFetchTriggered = true;
+      const ok = await fetchWithFallback(cleanedQuery);
+      if (!ok) ensureSerpManualButton();
+    }
+
+    function scheduleSerpAutoTry() {
+      void runSerpAutoFetchOnce();
+    }
+
+    if (SETTINGS.autoDetectOnSERP && serpLooksLikeMedia()) {
+      void runSerpAutoFetchOnce();
     } else {
-      const btn = document.createElement('button');
-      btn.textContent = 'Search TMDb Info';
-      btn.id = 'tmdb-button';
-      btn.onclick = () => fetchWithFallback(cleanedQuery);
-      parent.prepend(btn);
+      ensureSerpManualButton();
+    }
+
+    if (SETTINGS.autoDetectOnSERP && !serpAutoFetchTriggered) {
+      const isBingSerp = isBing && SETTINGS.enableOnBingPage;
+      const moRoot = isGoogle && SETTINGS.enableOnGooglePage
+        ? (document.getElementById('main') || document.body)
+        : isBingSerp
+          ? document.body
+          : null;
+      if (moRoot) {
+        let moRaf = 0;
+        const scheduleSerpTry = () => {
+          if (moRaf) return;
+          moRaf = requestAnimationFrame(() => {
+            moRaf = 0;
+            scheduleSerpAutoTry();
+          });
+        };
+        const mo = new MutationObserver(scheduleSerpTry);
+        mo.observe(moRoot, { childList: true, subtree: true });
+        const observeMs = isBingSerp ? 25000 : 15000;
+        const stopObserver = () => { try { mo.disconnect(); } catch (e) { /* ignore */ } };
+        setTimeout(stopObserver, observeMs);
+        scheduleSerpTry();
+        setTimeout(() => scheduleSerpAutoTry(), 400);
+        setTimeout(() => scheduleSerpAutoTry(), 2000);
+        if (isBingSerp) {
+          setTimeout(() => scheduleSerpAutoTry(), 5000);
+          setTimeout(() => scheduleSerpAutoTry(), 9000);
+        }
+      }
+    }
+
+    if (isBing && SETTINGS.enableOnBingPage) {
+      setTimeout(() => ensureSerpManualButton(), 150);
+      setTimeout(() => ensureSerpManualButton(), 900);
+      setTimeout(() => ensureSerpManualButton(), 2500);
     }
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
     imdbHandler();
