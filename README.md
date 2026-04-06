@@ -1,86 +1,151 @@
-# Tampermonkey scripts
+# Movie/TV Shows Links Aggregator
 
-This repository contains a set of Tampermonkey/Greasemonkey userscripts by Saad1430. Each script includes a header with metadata (name, version, @match rules and grants). Below are short summaries and usage notes for each script in this folder.
+> A userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
 
-## Contents
-- `bing-search-automation.user.js` — Bing Random Search Automation
-- `movies-tv-series.user.js` — Smart Movie/Series Google/Bing Search (TMDb)
-- `twitch-drop-claim.user.js` — Twitch Auto Claim Drops
+**Current version:** `1.7.2` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430)
+
+---
+
+## What does it do?
+
+When you search for a movie or TV show on Google or Bing, the script automatically detects it and adds a card to your results with everything you need in one place:
+
+- **TMDb & IMDb IDs** — click to copy either one instantly
+- **Streaming links** — a curated list of working players, updated regularly. CineSrc.st also supports direct download, shown inline next to its watch link
+- **Frontend links** — full-featured movie sites (Cineby, CinemaOS, ShuttleTV, Hexa, and more)
+- **Torrent links** — direct magnet links from YTS (movies), plus shortcuts to 1337x, EZTV, TPB, and others
+- **Stremio deep-link** — opens the title directly in your Stremio app
+- **Trakt links** — jump straight to the title on app.trakt.tv
+- **Watch Trailer** — plays the official YouTube trailer in a popup, no new tab needed
+- **Content rating** — fetches the MPAA/TV certification (e.g. PG-13, TV-MA)
+
+For **TV shows** specifically, you also get episode controls — pick any season and episode and all the player links update automatically.
+
+---
+
+## Where does it work?
+
+| Site | What happens |
+|---|---|
+| Google Search | Auto-detects movie/TV searches and injects the info card |
+| Bing Search | Same as Google |
+| DuckDuckGo (`duckduckgo.com`, `noai.duckduckgo.com`) | Script runs on these origins; SERP integration is planned — not active yet |
+| Brave Search | Script runs on the domain; SERP integration is planned — not active yet |
+| IMDb title pages | Adds a **▶ Play** button next to the watchlist button |
+| Trakt pages | Adds a play icon to the actions bar (or use **Shift+P**) |
+| YTS movie pages | Adds a **Play** button next to the download button |
 
 ---
 
 ## Installation
-1. Install Tampermonkey (or a compatible userscript manager) in your browser.
-2. Open the `.user.js` file you want to use and copy its contents, or open it locally with your browser's file:// handler.
-3. In Tampermonkey, choose "Create a new script" and paste the script contents, or open the script file directly from disk (Tampermonkey will prompt to install when opening a `.user.js` URL).
-4. Save and enable the script in Tampermonkey. Reload the matched pages to let the script run.
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser (Chrome, Firefox, Edge, Safari)
+2. Open [`movies-tv-series.user.js`](https://github.com/saad1430/tampermonkey/raw/main/movies-tv-series.user.js) — Tampermonkey will prompt you to install it
+3. Click **Install**
+4. On first run, you'll be asked for a **TMDb API key** — get one free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
+5. Paste your key and hit OK — you're done
+
+> You can add multiple API keys (comma-separated) in the settings panel under the **TMDb API keys** section. The script rotates between them automatically, which helps avoid hitting TMDb's rate limits.
 
 ---
 
-## Scripts
+## Settings
 
-### `bing-search-automation.user.js`
-- Name: Bing Random Search Automation
-- Version: 1.2
-- Match: `https://www.bing.com/*`
-- Description: Automates randomized Bing searches using a phrase pool, with human-like randomized delays, notifications, and a compact status UI.
-- Controls & keybinds:
-  - Start: Click the **Start** button (bottom-left) or press `Ctrl+Shift+C`.
-  - Stop: Click the **Stop** button (bottom-left) or press `Ctrl+Shift+X`.
-- Behavior:
-  - Runs up to `maxSearches` searches (default 32). Each search uses a random phrase from the script's `words` array and either submits the Bing search form or navigates to the search URL.
-  - Shows small notifications (bottom-right) for status and next-search countdown.
-  - Badge shows progress and remaining seconds until the next search.
-- Customization:
-  - Edit the script to change `maxSearches`, `minDelay`, `maxDelay`, or to add/remove phrases in the `words` array.
-- Notes & caution:
-  - Automated search activity can trigger rate-limiting or violate a website's terms of service. Use responsibly and at your own risk.
+Press **Shift+R** on any supported page (or long-press on mobile) to open the settings panel.
 
----
+You can also click the **⚙** floating button that appears in the bottom-right corner.
 
-### `movies-tv-series.user.js`
-- Name: Smart Movie/Series Google Search (TMDb) + Settings Panel
-- Version: 1.1.2
-- Match: `https://www.google.com/search*`, `https://www.bing.com/search*`
-- Grants: `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_setClipboard`, `GM_addStyle`
-- Description: Detects movie/TV-related search results on Google and Bing, surfaces TMDb and IMDb IDs, optional streaming/torrent links, and provides a settings panel.
-- Controls & keybinds:
-  - Open settings panel: `Shift+R` (also long-press on touch for ~1.5s)
-- Behavior:
-  - Auto-detects media-like SERP results (configurable). When detected, it inserts an info card with TMDb ID, IMDb ID, links to streaming frontends, torrent site shortcuts, and optional features controlled via settings.
-  - Settings are persisted via `GM_setValue` and `GM_getValue`.
-- Customization & setup:
-  - This script requires a TMDb API key to fetch metadata. On first run it will prompt for TMDb keys (comma-separated). Keys are stored via Tampermonkey's GM storage.
-  - Settings include toggles for streaming links, frontend links, torrent shortcuts, YTS torrents, Stremio/trakt links, episode selection, notifications, and more.
-- Notes:
-  - Some provided streaming/torrent links point to third-party services. The script simply constructs links; it does not host content. Use in accordance with local laws and site terms.
+### Available toggles
+
+| Setting | What it does |
+|---|---|
+| Auto-detect Movies/TV | Automatically shows the card when a media search is detected |
+| Google / Bing / IMDb / Trakt / YTS support | Turn the script on or off per site |
+| Streaming links | The main list of watch links |
+| Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
+| Torrent sites | 1337x, EZTV, LimeTorrents, TPB, etc. |
+| YTS Direct Magnets | Pulls live magnet links directly from YTS (movies only) |
+| "Open in Stremio" link | Deep link to open in your Stremio app |
+| Trakt link | Adds a direct app.trakt.tv link under the IMDb ID |
+| Trakt search results link | Adds a Trakt search link as a separate toggle from the direct link |
+| Allow changing episode number | Shows season/episode selectors for TV shows |
+| Watch trailer button | Plays the official trailer in an in-page popup |
+| Autoplay trailer | Auto-starts the trailer when opened (mind your volume) |
+| Change result button | Lets you pick a different TMDb result if the first one is wrong |
+| Certification | Displays the content rating (e.g. PG-13, TV-MA) |
+| Transparency/Glassy mode | Makes modals and panels use a frosted-glass look |
+| Notifications | Toast notifications for actions and status |
 
 ---
 
-### `twitch-drop-claim.user.js`
-- Name: Twitch Auto Claim Drops
-- Version: 1.4
-- Match: `https://www.twitch.tv/drops/inventory`
-- Description: Watches the Drops inventory page and auto-clicks "Claim" buttons when available. Also displays a persistent countdown and refreshes the page periodically.
-- Behavior:
-  - Observes DOM mutations and periodically scans for buttons containing the text "claim" and clicks them if enabled.
-  - Shows transient notifications and a persistent reload countdown (default reload every 5 minutes).
-- Notes & caution:
-  - Use responsibly. Automating interactions on a service can violate terms of service or trigger anti-bot measures.
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Shift+R` | Open/close settings panel |
+| `Shift+P` | Toggle the streaming links overlay (on IMDb and Trakt pages) |
 
 ---
 
-## Common notes
-- All scripts were authored by Saad1430 and include header metadata at the top of each file with `@name`, `@version`, `@match`, and `@grant` statements.
-- Before using any automation script on your account, review the site terms and consider creating a throwaway or test account if you want to experiment safely.
+## How the auto-detect works
+
+On Google and Bing, the script scans the page for signs that you're searching for a movie or TV show — things like JSON-LD schema data, links to IMDb/TMDb/Rotten Tomatoes, and knowledge panel keywords. If it finds a match, the info card appears automatically. If it doesn't auto-detect, a **"Search Movie/TV Info"** button will appear at the top of results that you can click manually.
+
+---
+
+## For TV shows: changing episodes
+
+When the info card is showing for a TV show, click **"Play another episode"** to reveal season and episode dropdowns. Once you pick your episode and hit **"Update player links"**, all the streaming links in the card update to point directly to that episode. The script validates your choice against the TMDb season data first so you won't get broken links.
+
+---
+
+## Notes on streaming links
+
+The script constructs links to third-party streaming sites — it does not host any content itself. Some sites may not have every title. Availability varies by region. Use in accordance with the laws in your country.
+
+For **torrents**, YTS magnet links are fetched live and include quality, file size, codec, audio channel info, and seeder/peer counts so you can make an informed choice before downloading.
+
+---
+
+## Troubleshooting
+
+**The card didn't appear automatically**
+→ Click the "Search Movie/TV Info" button at the top of results. You can also try adding more specific terms to your search (e.g. the year or "movie").
+
+**"No API key" prompt keeps appearing**
+→ Open settings with Shift+R, scroll to the API keys field, and paste your key there.
+
+**Trailer says "No trailer found"**
+→ TMDb doesn't have a trailer listed for that title. Check the TMDb page directly.
+
+**Links aren't updating when I change episodes**
+→ Make sure "Allow changing episode" is enabled in settings.
+
+**Play button not showing on IMDb**
+→ IMDb sometimes changes their page layout. Try pressing **Shift+P** as a fallback — it triggers the overlay directly.
+  > If that happens, please open an issue in the repo or talk to me directly at [discord](https://discord.gg/sTVCTf8Qtd)
+
+---
+
+## Other scripts in this repo
+
+This repo also contains a few personal-use scripts:
+
+- `bing-search-automation.user.js` — Automates randomized Bing searches (for rewards points)
+- `twitch-drop-claim.user.js` — Auto-claims Twitch drops on the inventory page
+- `swiftuploads-download-automation.user.js` — Download automation for SwiftUploads
+- `yts-enhancer.user.js` — Extra enhancements for YTS pages
+
+These are personal backups and not actively maintained or documented.
 
 ---
 
 ## Contributing
-- Send pull requests with clear descriptions of changes.
-- Keep userscript metadata (headers) accurate when updating behavior.
+
+Pull requests are welcome. If you're fixing a bug or updating a streaming site, please keep the userscript `@version` bumped and describe your changes clearly in the PR.
 
 ---
 
 ## License
-- No license file is included. If you want a specific license (MIT, Apache-2.0, etc.), tell me and I'll add it.
+
+Released under the [MIT License](https://opensource.org/licenses/MIT). See the `// @license MIT` metadata in [`movies-tv-series.user.js`](movies-tv-series.user.js).

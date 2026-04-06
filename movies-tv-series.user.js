@@ -1,14 +1,20 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.1
+// @version      1.7.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
+// @license      MIT
+// @updateURL    https://github.com/saad1430/tampermonkey/raw/main/movies-tv-series.user.js
+// @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/movies-tv-series.user.js
 // @match        https://www.google.com/search*
 // @match        https://google.com/search*
 // @match        https://www.bing.com/search*
 // @match        https://bing.com/search*
+// @match        https://duckduckgo.com/*
+// @match        https://noai.duckduckgo.com/*
+// @match        https://search.brave.com/*
 // @match        https://www.imdb.com/title/*
 // @match        https://imdb.com/title/*
 // @match        https://trakt.tv/movies/*
