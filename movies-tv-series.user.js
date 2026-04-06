@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.0
+// @version      1.7.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -48,11 +48,12 @@
     enableOnYTSPage: true,           // enable features on YTS title pages
     enableNotifications: true,       // toast notifications
     enableStreamingLinks: true,      // the big list of watch links
-    enableFrontendLinks: true,       // cineby/flixer/velora/etc
+    enableFrontendLinks: true,       // cineby/PStream/etc
     enableTorrentSiteShortcuts: true,// 1337x, EZTV, etc
     enableYtsTorrents: true,         // live torrents from YTS (movies only)
     enableStremioLink: true,         // stremio:// deep link
-    enableTraktLink: true,           // show Trakt search link under IMDb
+    enableTraktLink: true,           // Trakt app link
+    enableTraktSearchLink: true,     // Trakt search results link
     enableEpisodeSelection: true,    // allow changing episode number when playing TV
     enableTrailerButton: true,       // show Watch trailer button
     enableTrailerAutoPlay: false,    // auto-play trailer when opened
@@ -73,10 +74,11 @@
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Fixed auto-detecting on Google and Bing</li>
       <li>Improved the links updating process</li>
+      <li>Full support for Trakt v3</li>
       <li>Replaced various streaming sites with new ones</li>
       <li>Added CineSrc.st to the list of streaming sites</li>
       <li>Added ShuttleTV to the list of streaming sites</li>
-      <li>Full support for Trakt v3 on <code>app.trakt.tv</code></li>
+      <li>Minor UI improvements and bug fixes</li>
     </ul>
   `;
 
@@ -136,6 +138,9 @@
     .tmdb-settings header h2{margin:0;font-size:18px}
     .tmdb-settings .body{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .tmdb-settings .body .full{grid-column:1/-1}
+    .tmdb-settings details.tmdb-keys-details{border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:8px 10px;background:hsla(212, 62%, 16%, 0.35)}
+    .tmdb-settings details.tmdb-keys-details summary{cursor:pointer;font-weight:600;color:#e9f1f7;padding:4px 0;user-select:none}
+    .tmdb-settings .tmdb-keys-help{font-size:12px;opacity:0.75;margin:0 0 10px;line-height:1.45;color:#e9f1f7}
     .tmdb-settings label{display:flex;gap:8px;align-items:center;padding:8px 10px;background:hsla(212, 62%, 16%, 0.5);backdrop-filter: blur(7px);cursor:pointer;border:1px solid rgba(255,255,255,.06);border-radius:8px;color:#e9f1f7;font-weight:600;user-select:none}
     .tmdb-settings .row{display:flex;gap:8px;align-items:center}
     .tmdb-settings input[type="text"], .tmdb-settings textarea{width:98%;background:#071221;color:#e9f1f7;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px}
@@ -381,30 +386,35 @@
         </header>
         <div class="body">
           ${checkbox('autoDetectOnSERP', 'Auto-detect Movies/TV Shows', SETTINGS.autoDetectOnSERP)}
-          ${checkbox('enableOnGooglePage', 'Enable on Google site', SETTINGS.enableOnGooglePage)}
-          ${checkbox('enableOnBingPage', 'Enable on Bing site', SETTINGS.enableOnBingPage)}
-          ${checkbox('enableOnImdbPage', 'Enable on IMDB site', SETTINGS.enableOnImdbPage)}
-          ${checkbox('enableOnTraktPage', 'Enable on Trakt site', SETTINGS.enableOnTraktPage)}
-          ${checkbox('enableOnYTSPage', 'Enable on YTS site', SETTINGS.enableOnYTSPage)}
-          ${checkbox('enableNotifications', 'Enable notifications', SETTINGS.enableNotifications)}
-          ${checkbox('enableStreamingLinks', 'Show streaming links', SETTINGS.enableStreamingLinks)}
-          ${checkbox('enableFrontendLinks', 'Show frontend links', SETTINGS.enableFrontendLinks)}
-          ${checkbox('enableTorrentSiteShortcuts', 'Show torrent sites', SETTINGS.enableTorrentSiteShortcuts)}
-          ${checkbox('enableYtsTorrents', 'Fetch YTS torrents for movies', SETTINGS.enableYtsTorrents)}
-          ${checkbox('enableStremioLink', 'Show “Open in Stremio” link', SETTINGS.enableStremioLink)}
-          ${checkbox('enableTraktLink', 'Show Trakt (app.trakt.tv) links', SETTINGS.enableTraktLink)}
-          ${checkbox('enableEpisodeSelection', 'Allow changing episode number when playing TV', SETTINGS.enableEpisodeSelection)}
-          ${checkbox('enableTrailerButton', 'Show "Watch trailer" button', SETTINGS.enableTrailerButton)}
+          ${checkbox('enableOnGooglePage', 'Google support', SETTINGS.enableOnGooglePage)}
+          ${checkbox('enableOnBingPage', 'Bing support', SETTINGS.enableOnBingPage)}
+          ${checkbox('enableOnImdbPage', 'IMDB support', SETTINGS.enableOnImdbPage)}
+          ${checkbox('enableOnTraktPage', 'Trakt support', SETTINGS.enableOnTraktPage)}
+          ${checkbox('enableOnYTSPage', 'YTS support', SETTINGS.enableOnYTSPage)}
+          ${checkbox('enableNotifications', 'Notifications', SETTINGS.enableNotifications)}
+          ${checkbox('enableStreamingLinks', 'Streaming links', SETTINGS.enableStreamingLinks)}
+          ${checkbox('enableFrontendLinks', 'Frontend links', SETTINGS.enableFrontendLinks)}
+          ${checkbox('enableTorrentSiteShortcuts', 'Torrent sites', SETTINGS.enableTorrentSiteShortcuts)}
+          ${checkbox('enableYtsTorrents', 'YTS Direct Magnets (Movies only)', SETTINGS.enableYtsTorrents)}
+          ${checkbox('enableStremioLink', '“Open in Stremio” link', SETTINGS.enableStremioLink)}
+          ${checkbox('enableTraktLink', 'Trakt link', SETTINGS.enableTraktLink)}
+          ${checkbox('enableTraktSearchLink', 'Trakt search results link', SETTINGS.enableTraktSearchLink)}
+          ${checkbox('enableEpisodeSelection', 'Allow changing episode number (TV only)', SETTINGS.enableEpisodeSelection)}
+          ${checkbox('enableTrailerButton', 'Watch trailer button', SETTINGS.enableTrailerButton)}
           ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
-          ${checkbox('enableChangeResultButton', 'Show "Change result" button', SETTINGS.enableChangeResultButton)}
-          ${checkbox('showCertifications', 'Show certification', SETTINGS.showCertifications)}
-          ${checkbox('enableTransparencyMode', 'Enable transparency mode for modals/panels', SETTINGS.enableTransparencyMode)}
+          ${checkbox('enableChangeResultButton', 'Change result button', SETTINGS.enableChangeResultButton)}
+          ${checkbox('showCertifications', 'Certification', SETTINGS.showCertifications)}
+          ${checkbox('enableTransparencyMode', 'Transparency/Glassy mode', SETTINGS.enableTransparencyMode)}
 
           <div class="full">
-            <label class="full" style="flex-direction:column;align-items:flex-start">
-              <span style="opacity:.85;margin-bottom:6px">TMDb API Keys (comma separated)</span>
-              <textarea id="tmdb-keys" rows="3" placeholder="key1, key2, key3">${keysStr}</textarea>
-            </label>
+            <details class="tmdb-keys-details">
+              <summary>TMDb API keys</summary>
+              <p class="tmdb-keys-help">Enter multiple keys separated by commas. Using several keys lets the script rotate among them and reduces hitting TMDb rate limits compared to using a single key.</p>
+              <label class="full" style="flex-direction:column;align-items:flex-start">
+                <span style="opacity:.85;margin-bottom:6px">Comma-separated keys</span>
+                <textarea id="tmdb-keys" rows="3" placeholder="key1, key2, key3">${keysStr}</textarea>
+              </label>
+            </details>
           </div>
         </div>
         <footer>
@@ -671,7 +681,7 @@
       showNotification('No Results found!'); hideButton(); return;
     }
 
-    const traktUrls = SETTINGS.enableTraktLink ? buildTraktAppUrls(vidType, title, date, season_number) : null;
+    const traktUrls = buildTraktAppUrls(vidType, title, date, season_number);
 
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
@@ -689,8 +699,8 @@
           <span style="color:black;background-color:rgb(226,182,22);" class="tmdb-copy" id="imdb-id" title="Click to copy">${imdb || ''}</span>
           ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(IMDb ↗)</a>
                     <a href="https://www.imdb.com/title/${imdb}/parentalguide" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide ↗)</a>` : ''}
-                    ${traktUrls ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:bold;">(Trakt ↗)</a>
-                    <a href="${traktUrls.search}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
+                    ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:bold;">(Trakt ↗)</a>` : ''}
+                    ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
         </div>
         ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="stremio://detail/${vidType}/${imdb}" style="color:#1bb8d9;font-weight:bold;">Open in Stremio ↗</a></div>` : ''}
 
@@ -698,8 +708,8 @@
         <div style="margin-top:6px;">
           <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (recommended) ↗</a><br/>
           <a href="https://cinemaos.tech/player/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.tech (fastest) ↗</a><br/>
-          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CineSrc.st ↗</a>
-          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(Download)</a><br/>
+          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CineSrc.st ↗ </a> (Supports
+          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Direct Download</a>)<br/>
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
           <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
@@ -1243,7 +1253,7 @@
       return;
     }
     const btn = document.createElement('button');
-    btn.textContent = 'Search TMDb Info';
+    btn.textContent = 'Search Movie/TV Info';
     btn.id = 'tmdb-button';
     btn.style.display = 'block';
     if (isBing) {
