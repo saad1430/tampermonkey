@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.2
+// @version      1.7.3
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -42,6 +42,13 @@
 (async function () {
   'use strict';
 
+  /* Editable credits: display name → URL */
+  const specialThanks = {
+    'FMHY': 'https://fmhy.net',
+    'FMHY mirror': 'https://fmhy.xyz',
+    'Star the repo ⭐': 'https://github.com/saad1430/tampermonkey',
+  };
+
   /* ----------------------------------------------------
    * Settings (persisted) + Styles
    * -------------------------------------------------- */
@@ -65,7 +72,8 @@
     enableTrailerAutoPlay: false,    // auto-play trailer when opened
     enableChangeResultButton: true,  // show Change result button when multiple TMDb results
     showCertifications: true,        // fetch + display MPAA/TV rating
-    enableTransparencyMode: true     // use transparency mode for modals/panels
+    enableTransparencyMode: true,    // use transparency mode for modals/panels
+    openLinksInNewTab: true,         // open the displayed links in new tab
   };
 
 
@@ -82,9 +90,7 @@
       <li>Improved the links updating process</li>
       <li>Full support for Trakt v3</li>
       <li>Replaced various streaming sites with new ones</li>
-      <li>Added CineSrc.st to the list of streaming sites</li>
-      <li>Added ShuttleTV to the list of streaming sites</li>
-      <li>Minor UI improvements and bug fixes</li>
+      <li>Minor UI/UX improvements and bug fixes</li>
     </ul>
   `;
 
@@ -131,6 +137,30 @@
   let SETTINGS = loadSettings();
   maybeShowAnnouncement();
 
+  function linkTargetAttr() {
+    return SETTINGS.openLinksInNewTab ? 'target="_blank" rel="noopener"' : '';
+  }
+
+  /** Shown next to labels when http(s) links open in a new tab (matches “Open links in new tab”). */
+  function linkExternalTabArrow() {
+    return SETTINGS.openLinksInNewTab ? ' ↗' : '';
+  }
+
+  function formatSpecialThanksHtml(forSettingsPanel) {
+    const entries = Object.entries(specialThanks).filter(([, u]) => u && String(u).trim());
+    if (!entries.length) return '';
+    const parts = entries.map(([name, url]) => {
+      const esc = String(name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      const safeUrl = String(url).replace(/"/g, '&quot;');
+      return `<a href="${safeUrl}" ${linkTargetAttr()}>${esc}</a>`;
+    });
+    const inner = `Special Thanks to: ${parts.join(' · ')}`;
+    if (forSettingsPanel) {
+      return `<div class="full tmdb-special-thanks tmdb-special-thanks--settings">${inner}</div>`;
+    }
+    return `<div class="tmdb-special-thanks tmdb-special-thanks--card">${inner}</div>`;
+  }
+
   /* ----------------------------------------------------
   * Styles
   * -------------------------------------------------- */
@@ -160,7 +190,10 @@
 
     .tmdb-info-card{padding:10px;background:rgba(3,37,65,0.1);border-left:5px solid #1bb8d9;margin-bottom:12px;font-family:Arial;user-select:none;position:relative}
     .tmdb-info-card .tmdb-title{font-size:18px;font-weight:bold}
-    .tmdb-info-card .tmdb-toggle{position:absolute;top:10px;right:10px;padding:4px 10px;background:#1bb8d9;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer}
+    .tmdb-special-thanks--settings{font-size:12px;opacity:0.85;line-height:1.5;color:#e9f1f7;margin-top:4px;padding:8px 10px;background:hsla(212, 62%, 16%, 0.35);border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+    .tmdb-special-thanks--settings a{color:#1bb8d9;font-weight:600}
+    .tmdb-special-thanks--card{font-size:12px;opacity:0.88;margin-top:10px;line-height:1.45;color:#e9f1f7}
+    .tmdb-special-thanks--card a{color:#1bb8d9;font-weight:600}
     .tmdb-copy{cursor:pointer}
 
   /* nicer selects for season/episode controls */
@@ -401,16 +434,19 @@
           ${checkbox('enableStreamingLinks', 'Streaming links', SETTINGS.enableStreamingLinks)}
           ${checkbox('enableFrontendLinks', 'Frontend links', SETTINGS.enableFrontendLinks)}
           ${checkbox('enableTorrentSiteShortcuts', 'Torrent sites', SETTINGS.enableTorrentSiteShortcuts)}
+          ${checkbox('openLinksInNewTab', 'Open links in new tab', SETTINGS.openLinksInNewTab)}
           ${checkbox('enableYtsTorrents', 'YTS Direct Magnets (Movies only)', SETTINGS.enableYtsTorrents)}
           ${checkbox('enableStremioLink', '“Open in Stremio” link', SETTINGS.enableStremioLink)}
           ${checkbox('enableTraktLink', 'Trakt link', SETTINGS.enableTraktLink)}
           ${checkbox('enableTraktSearchLink', 'Trakt search results link', SETTINGS.enableTraktSearchLink)}
           ${checkbox('enableEpisodeSelection', 'Allow changing episode number (TV only)', SETTINGS.enableEpisodeSelection)}
           ${checkbox('enableTrailerButton', 'Watch trailer button', SETTINGS.enableTrailerButton)}
-          ${checkbox('enableTrailerAutoPlay', 'Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" target="_blank">[for constant volumes use this extension]</a>', SETTINGS.enableTrailerAutoPlay)}
+          ${checkbox('enableTrailerAutoPlay', `Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" ${linkTargetAttr()}>[for constant volumes use this extension]</a>`, SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Change result button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Certification', SETTINGS.showCertifications)}
           ${checkbox('enableTransparencyMode', 'Transparency/Glassy mode', SETTINGS.enableTransparencyMode)}
+
+          ${formatSpecialThanksHtml(true)}
 
           <div class="full">
             <details class="tmdb-keys-details">
@@ -681,7 +717,7 @@
     } else if (Type === 'tv') {
       vidType = 'tv'; vidType1337 = 'TV'; ET_cat = '2'; query = `/${season_number}/${episode_number}`; smashQuery = `?s=${season_number}&e=${episode_number}`; multiQuery = `&s=${season_number}&e=${episode_number}`;
       if (SETTINGS.enableTorrentSiteShortcuts && imdb) {
-        eztv = `<a href="https://eztvx.to/search/${imdb}" target="_blank" style="color:#1bb8d9;font-weight:bold;">EZTVx.to ↗</a> - <a href="https://eztv1.xyz/search/${imdb}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 1 ↗</a> - <a href="https://eztv.yt/search/${imdb}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 2 ↗</a><br/>`;
+        eztv = `<a href="https://eztvx.to/search/${imdb}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">EZTVx.to${linkExternalTabArrow()}</a> - <a href="https://eztv1.xyz/search/${imdb}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Mirror 1${linkExternalTabArrow()}</a> - <a href="https://eztv.yt/search/${imdb}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Mirror 2${linkExternalTabArrow()}</a><br/>`;
       }
     } else {
       showNotification('No Results found!'); hideButton(); return;
@@ -692,50 +728,49 @@
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
     container.innerHTML = `
-      <button class="tmdb-toggle" id="toggle-details-btn">Hide Details</button>
       <div class="tmdb-title">${title} (${date})</div>
       <div id="tmdb-details">
         <div>
           <strong>TMDb ID:</strong>
           <span style="color:#1bb8d9;background-color:rgb(3,37,65);" class="tmdb-copy" id="tmdb-id" title="Click to copy">${tmdbID}</span>
-          <a href="https://themoviedb.org/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(TMDb ↗)</a>
+          <a href="https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(TMDb${linkExternalTabArrow()})</a>
         </div>
         <div>
           <strong>IMDb ID:</strong>
           <span style="color:black;background-color:rgb(226,182,22);" class="tmdb-copy" id="imdb-id" title="Click to copy">${imdb || ''}</span>
-          ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(IMDb ↗)</a>
-                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" target="_blank" style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide ↗)</a>` : ''}
-                    ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:bold;">(Trakt ↗)</a>` : ''}
-                    ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" target="_blank" rel="noopener" style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
+          ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(IMDb${linkExternalTabArrow()})</a>
+                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide${linkExternalTabArrow()})</a>` : ''}
+                    ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:bold;">(Trakt${linkExternalTabArrow()})</a>` : ''}
+                    ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
         </div>
-        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="stremio://detail/${vidType}/${imdb}" style="color:#1bb8d9;font-weight:bold;">Open in Stremio ↗</a></div>` : ''}
+        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="stremio://detail/${vidType}/${imdb}" style="color:#1bb8d9;font-weight:bold;">Open in Stremio${linkExternalTabArrow()}</a></div>` : ''}
 
         ${SETTINGS.enableStreamingLinks ? `
         <div style="margin-top:6px;">
-          <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (recommended) ↗</a><br/>
-          <a href="https://cinemaos.tech/player/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.tech (fastest) ↗</a><br/>
-          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CineSrc.st ↗ </a> (Supports
-          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Direct Download</a>)<br/>
-          <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net ↗</a><br/>
-          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to ↗</a><br/>
-          <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov ↗</a><br/>
-          <a href="https://111movies.net/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.net ↗</a><br/>
-          <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on VidFast.pro ↗</a><br/>
-          <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Smashy.stream ↗</a><br/>
+          <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on VidEasy.net (recommended)${linkExternalTabArrow()}</a><br/>
+          <a href="https://cinemaos.tech/player/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS.tech (fastest)${linkExternalTabArrow()}</a><br/>
+          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on CineSrc.st${linkExternalTabArrow()} </a> (Supports
+          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Direct Download</a>)<br/>
+          <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on VidKing.net${linkExternalTabArrow()}</a><br/>
+          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>
+          <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>
+          <a href="https://111movies.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>
+          <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>
+          <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on Smashy.stream${linkExternalTabArrow()}</a><br/>
         </div>` : ''}
 
         ${SETTINGS.enableFrontendLinks ? `
         <div style="margin-top:6px;">
           <strong>Watch on frontends:</strong><br/>
-          <a href="https://www.cineby.sc/${vidType}/${tmdbID}${query}?play=true" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Cineby</a>
-          <a href="https://www.cineby.sc/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS ↗</a>
-          <a href="https://cinemaos.live/${vidType}/${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on ShuttleTV ↗</a><br/>
-          <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on Hexa ↗</a>
-          <a href="https://hexa.su/details/${vidType}/${tmdbID}/" target="_blank" style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
-          <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on 67Movies ↗</a><br/>
-          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Watch on PStream ↗</a> ${vidType === "tv" ? "(Auto Episode Not Available, Playback will start from first episode)" : "(4K possible)"}<br/>
+          <a href="https://www.cineby.sc/${vidType}/${tmdbID}${query}?play=true" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on Cineby${linkExternalTabArrow()}</a>
+          <a href="https://www.cineby.sc/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on CinemaOS${linkExternalTabArrow()}</a>
+          <a href="https://cinemaos.live/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>
+          <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on Hexa${linkExternalTabArrow()}</a>
+          <a href="https://hexa.su/details/${vidType}/${tmdbID}/" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(More Info)</a><br/>
+          <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on 67Movies${linkExternalTabArrow()}</a><br/>
+          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Watch on PStream${linkExternalTabArrow()}</a> ${vidType === "tv" ? "(Auto Episode Not Available, Playback will start from first episode)" : "(4K possible)"}<br/>
         </div>` : ''}
 
         ${html}
@@ -743,39 +778,24 @@
         ${SETTINGS.enableTorrentSiteShortcuts ? `
         <div style="margin-top:6px;">
           <strong>Search on Torrent Sites:</strong><br/>
-          <a href="https://1337x.to/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">1337x.to ↗</a> -
-          <a href="https://1337x.st/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 1 ↗</a> -
-          <a href="https://x1337x.cc/category-search/${title}/${vidType1337}/1/" target="_blank" style="color:#1bb8d9;font-weight:bold;">Mirror 2 ↗</a><br/>
+          <a href="https://1337x.to/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">1337x.to${linkExternalTabArrow()}</a> -
+          <a href="https://1337x.st/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Mirror 1${linkExternalTabArrow()}</a> -
+          <a href="https://x1337x.cc/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Mirror 2${linkExternalTabArrow()}</a><br/>
           ${eztv}
-          <a href="https://www.limetorrents.fun/search/${vidType1337}/${title}" target="_blank" style="color:#1bb8d9;font-weight:bold;">LimeTorrents.fun ↗</a><br/>
-          <a href="https://thepiratebay.org/search.php?q=${title}&video=on&search=Pirate+Search&page=0" target="_blank" style="color:#1bb8d9;font-weight:bold;">ThePirateBay.org ↗</a><br/>
-          <a href="https://extratorrent.st/search/?new=1&search=${title}&s_cat=${ET_cat}" target="_blank" style="color:#1bb8d9;font-weight:bold;">ExtraTorrent.st ↗</a><br/>
-          <a href="https://rutor.is/search/${title}" target="_blank" style="color:#1bb8d9;font-weight:bold;">Rutor.is ↗</a><br/>
+          <a href="https://www.limetorrents.fun/search/${vidType1337}/${title}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">LimeTorrents.fun${linkExternalTabArrow()}</a><br/>
+          <a href="https://thepiratebay.org/search.php?q=${title}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">ThePirateBay.org${linkExternalTabArrow()}</a><br/>
+          <a href="https://extratorrent.st/search/?new=1&search=${title}&s_cat=${ET_cat}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">ExtraTorrent.st${linkExternalTabArrow()}</a><br/>
+          <a href="https://rutor.is/search/${title}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">Rutor.is${linkExternalTabArrow()}</a><br/>
         </div>` : ''}
+        ${formatSpecialThanksHtml(false)}
       </div>`;
 
     getMountTarget().prepend(container);
     hideButton();
 
-    const toggleBtn = container.querySelector('#toggle-details-btn');
     const detailsDiv = container.querySelector('#tmdb-details');
     const tmdb_id = container.querySelector('#tmdb-id');
     const imdb_id = container.querySelector('#imdb-id');
-
-    const isHidden = sessionStorage.getItem('tmdbToggleHidden') === 'true';
-    detailsDiv.style.display = isHidden ? 'none' : 'block';
-    toggleBtn.textContent = isHidden ? 'Show Details' : 'Hide Details';
-    // sync FAB visibility with details visibility
-    try { const fab = document.getElementById('tmdb-fab-settings'); if (fab) fab.style.display = isHidden ? 'none' : 'flex'; } catch (e) { }
-
-    toggleBtn.addEventListener('click', () => {
-      const currentlyHidden = detailsDiv.style.display === 'none';
-      detailsDiv.style.display = currentlyHidden ? 'block' : 'none';
-      toggleBtn.textContent = currentlyHidden ? 'Hide Details' : 'Show Details';
-      showNotification(currentlyHidden ? 'Details will be shown until you hide them.' : 'Details will be hidden until you show them.');
-      sessionStorage.setItem('tmdbToggleHidden', (!currentlyHidden).toString());
-      try { const fab = document.getElementById('tmdb-fab-settings'); if (fab) fab.style.display = detailsDiv.style.display === 'none' ? 'none' : 'flex'; } catch (e) { }
-    });
 
     tmdb_id?.addEventListener('click', () => { GM_setClipboard(tmdbID, 'text'); showNotification('TMDB id copied to clipboard'); });
     imdb_id?.addEventListener('click', () => { if (imdb) { GM_setClipboard(imdb, 'text'); showNotification('IMDB id copied to clipboard'); } });

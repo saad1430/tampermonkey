@@ -1,8 +1,8 @@
 # Movie/TV Shows Links Aggregator
 
-> A userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
+> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.2` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430)
+**Current version:** `1.7.3` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
@@ -29,9 +29,9 @@ For **TV shows** specifically, you also get episode controls — pick any season
 |---|---|
 | Google Search | Auto-detects movie/TV searches and injects the info card |
 | Bing Search | Same as Google |
-| DuckDuckGo (`duckduckgo.com`, `noai.duckduckgo.com`) | Script runs on these origins; SERP integration is planned — not active yet |
-| Brave Search | Script runs on the domain; SERP integration is planned — not active yet |
-| IMDb title pages | Adds a **▶ Play** button next to the watchlist button |
+| DuckDuckGo | Same as Google |
+| Brave Search | Same as Google |
+| IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
 | Trakt pages | Adds a play icon to the actions bar (or use **Shift+P**) |
 | YTS movie pages | Adds a **Play** button next to the download button |
 
@@ -45,8 +45,10 @@ For **TV shows** specifically, you also get episode controls — pick any season
 4. On first run, you'll be asked for a **TMDb API key** — get one free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
 5. Paste your key and hit OK — you're done
 
+
 > You can add multiple API keys (comma-separated) in the settings panel under the **TMDb API keys** section. The script rotates between them automatically, which helps avoid hitting TMDb's rate limits.
 
+The script includes `@updateURL` and `@downloadURL` headers pointing to this repo, so Tampermonkey can check for and apply updates automatically.
 ---
 
 ## Settings
@@ -64,6 +66,7 @@ You can also click the **⚙** floating button that appears in the bottom-right 
 | Streaming links | The main list of watch links |
 | Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
 | Torrent sites | 1337x, EZTV, LimeTorrents, TPB, etc. |
+| Open links in new tab | All links in the info card open in a new tab (on by default) |
 | YTS Direct Magnets | Pulls live magnet links directly from YTS (movies only) |
 | "Open in Stremio" link | Deep link to open in your Stremio app |
 | Trakt link | Adds a direct app.trakt.tv link under the IMDb ID |
@@ -146,6 +149,12 @@ Pull requests are welcome. If you're fixing a bug or updating a streaming site, 
 
 ---
 
+## Special Thanks
+
+[FMHY](https://fmhy.net)
+
+---
+
 ## License
 
-Released under the [MIT License](https://opensource.org/licenses/MIT). See the `// @license MIT` metadata in [`movies-tv-series.user.js`](movies-tv-series.user.js).
+This project is licensed under the **MIT License**.
