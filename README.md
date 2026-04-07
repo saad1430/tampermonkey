@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.3` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.4` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
@@ -77,6 +77,7 @@ You can also click the **⚙** floating button that appears in the bottom-right 
 | Change result button | Lets you pick a different TMDb result if the first one is wrong |
 | Certification | Displays the content rating (e.g. PG-13, TV-MA) |
 | Transparency/Glassy mode | Makes modals and panels use a frosted-glass look |
+| Theme | Switch between **TMDb**, **IMDb**, **Trakt**, or a **Custom** colour scheme |
 | Notifications | Toast notifications for actions and status |
 
 ---
