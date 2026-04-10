@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.4
+// @version      1.7.5
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -142,6 +142,7 @@
     enableOnTraktPage: true,
     enableOnYTSPage: true,
     enableNotifications: true,
+    debugNetworkRequests: false,
     enableStreamingLinks: true,
     enableFrontendLinks: true,
     enableTorrentSiteShortcuts: true,
@@ -541,6 +542,34 @@
     return null;
   }
 
+  function getCallerLineForDebug(skipFrames = 2) {
+    try {
+      const stack = String(new Error().stack || '');
+      const lines = stack.split('\n').map(s => s.trim()).filter(Boolean);
+      const candidates = lines.slice(skipFrames);
+      for (const line of candidates) {
+        // Chrome-style: "at fn (https://.../movies-tv-series.user.js:1234:56)"
+        const m = line.match(/:(\d+):\d+\)?$/);
+        if (m) return Number(m[1]);
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  function debugNetLog(kind, url, status, response, err = null) {
+    if (!SETTINGS.debugNetworkRequests) return;
+    const line = getCallerLineForDebug(3);
+    const where = line ? `:${line}` : '';
+    const tag = `[TMDb Debug] ${kind}${where}`;
+    try {
+      const group = console.groupCollapsed ? console.groupCollapsed : console.log;
+      group(tag, { url, status });
+      if (err) console.error('error', err);
+      if (typeof response !== 'undefined') console.log('response', response);
+      if (console.groupEnd) console.groupEnd();
+    } catch { /* ignore */ }
+  }
+
   function tmdbApiGetJson(url) {
     const xhr = getGmXhr();
     if (xhr) {
@@ -549,14 +578,32 @@
           method: 'GET', url, timeout: 45000,
           onload(resp) {
             if (resp.status < 200 || resp.status >= 300) { reject(new Error(`TMDb HTTP ${resp.status}`)); return; }
-            try { resolve(JSON.parse(resp.responseText || '{}')); } catch (e) { reject(e); }
+            try {
+              const json = JSON.parse(resp.responseText || '{}');
+              debugNetLog('GM_xmlhttpRequest', url, resp.status, json);
+              resolve(json);
+            } catch (e) {
+              debugNetLog('GM_xmlhttpRequest', url, resp.status, resp.responseText, e);
+              reject(e);
+            }
           },
-          onerror() { reject(new Error('TMDb network error')); },
-          ontimeout() { reject(new Error('TMDb request timeout')); },
+          onerror(e) { debugNetLog('GM_xmlhttpRequest', url, resp?.status, undefined, e || new Error('TMDb network error')); reject(new Error('TMDb network error')); },
+          ontimeout(e) { debugNetLog('GM_xmlhttpRequest', url, resp?.status, undefined, e || new Error('TMDb request timeout')); reject(new Error('TMDb request timeout')); },
         });
       });
     }
-    return fetch(url).then((r) => { if (!r.ok) throw new Error(`TMDb HTTP ${r.status}`); return r.json(); });
+    return fetch(url).then(async (r) => {
+      const status = r.status;
+      if (!r.ok) {
+        let text = '';
+        try { text = await r.text(); } catch { /* ignore */ }
+        debugNetLog('fetch', url, status, text);
+        throw new Error(`TMDb HTTP ${status}`);
+      }
+      const json = await r.json();
+      debugNetLog('fetch', url, status, json);
+      return json;
+    }).catch((e) => { debugNetLog('fetch', url, undefined, undefined, e); throw e; });
   }
 
   /* ----------------------------------------------------
@@ -747,6 +794,7 @@
           ${checkbox('enableChangeResultButton', 'Change result button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Certification', SETTINGS.showCertifications)}
           ${checkbox('enableTransparencyMode', 'Transparency/Glassy mode', SETTINGS.enableTransparencyMode)}
+          ${checkbox('debugNetworkRequests', 'Debug network requests (console logs)', SETTINGS.debugNetworkRequests)}
 
           ${formatSpecialThanksHtml(true)}
 
@@ -849,11 +897,8 @@
     return `<label><input id="cb-${id}" type="checkbox" ${checked ? 'checked' : ''}> ${label}</label>`;
   }
 
-  /* Hotkey + touch long-press */
+  /* Hotkey for settings panel (Shift+R) */
   document.addEventListener('keydown', (e) => { if (e.shiftKey && e.key.toLowerCase() === 'r') openSettingsPanel(); });
-  let touchTimer;
-  document.addEventListener('touchstart', () => { touchTimer = setTimeout(openSettingsPanel, 1500); });
-  document.addEventListener('touchend', () => clearTimeout(touchTimer));
 
   /* ----------------------------------------------------
    * Smart media detection (SERP)
@@ -861,8 +906,9 @@
   function serpHasMovieTvJsonLd() {
     const typeMatches = (typ) => {
       if (!typ || typeof typ !== 'string') return false;
-      return /Movie|TVSeries|TelevisionSeries|TVEpisode|VideoObject|CreativeWorkSeason/i.test(typ)
-        || /schema\.org\/(Movie|TVSeries|TelevisionSeries|TVEpisode|VideoObject)/i.test(typ);
+      /* Exclude VideoObject: Google embeds it for many non-film SERP videos (games, news, places). */
+      return /Movie|TVSeries|TelevisionSeries|TVEpisode|CreativeWorkSeason/i.test(typ)
+        || /schema\.org\/(Movie|TVSeries|TelevisionSeries|TVEpisode)/i.test(typ);
     };
     const walk = (node) => {
       if (!node || typeof node !== 'object') return false;
@@ -902,44 +948,61 @@
     return false;
   }
 
+  /** Obvious encyclopedic / geo queries — organic snippets often mention “release”, “cast”, etc. */
+  function serpQueryLooksLikeNonMediaLookup(q) {
+    const s = String(q || '').trim();
+    if (!s) return false;
+    return /\b(capital|population|president|prime minister|currency|gdp|official language)s?\s+of\b/i.test(s)
+      || /\bwhat\s+is\s+the\s+(capital|population|currency|gdp|official language)\b/i.test(s)
+      || /\bwhere\s+is\b.+\blocated\b/i.test(s)
+      || /\bhow\s+(many|much)\s+people\b/i.test(s)
+      || /\b(area|size|timezone)\s+of\b/i.test(s);
+  }
+
   function scanGoogleForMediaHints() {
     if (!isGoogle || !SETTINGS.enableOnGooglePage) return false;
+    if (serpQueryLooksLikeNonMediaLookup(getSearchQuery())) return false;
     if (serpHasMovieTvJsonLd()) return true;
     if (serpHasSchemaMicrodata()) return true;
     if (serpRootsContainMediaSiteLinks(['#search', '#rso', '#main', '#center_col', '#rhs', '#rhs_col'])) return true;
     const imdbAnchors = '#search a[href*="imdb.com/title/"], #rso a[href*="imdb.com/title/"], #main a[href*="imdb.com/title/"], #center_col a[href*="imdb.com/title/"], #rhs a[href*="imdb.com/title/"], #rhs_col a[href*="imdb.com/title/"]';
     if (document.querySelector(imdbAnchors)) return true;
-    const panelRe = /IMDb|TV series|TV show|Movie\b|Movies\b|Episodes|Episode\b|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b/i;
-    for (const sel of ['#rhs', '#rhs_col', '#center_col', '#rso']) {
+    /* Loose text: knowledge panel only — #center_col / #rso are full results and match people, games, etc. */
+    /* No standalone \bMovie(s)\b — geo/topic panels use “Movies” for unrelated lists. */
+    const knowledgePanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
+    for (const sel of ['#rhs', '#rhs_col']) {
       const el = document.querySelector(sel);
-      if (el && panelRe.test(el.innerText)) return true;
+      if (el && knowledgePanelRe.test(el.innerText)) return true;
     }
-    const strictRe = /IMDb|TV series|TV show|Rotten Tomatoes|Metacritic|Directed by|Running time|Where to watch|Original release|Film series|\bEpisodes?\b.*\bSeason\b/i;
-    for (const sel of ['#main', '#search']) {
+    /* Organic + main: stricter — drop Metacritic text (games use Metacritic too) and vague “Original release”. */
+    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    for (const sel of ['#center_col', '#rso', '#main', '#search']) {
       const el = document.querySelector(sel);
-      if (el && strictRe.test(el.innerText)) return true;
+      if (el && organicStrictRe.test(el.innerText)) return true;
     }
     return false;
   }
 
   function scanBingForMediaHints() {
     if (!isBing || !SETTINGS.enableOnBingPage) return false;
+    if (serpQueryLooksLikeNonMediaLookup(getSearchQuery())) return false;
     if (serpHasMovieTvJsonLd()) return true;
     if (serpHasSchemaMicrodata()) return true;
     const bingRoots = ['#b_results', '#b_context', '#b_content', '#results', '#ajaxsrwrap', 'main[role="main"]', 'main', '[role="main"]'];
     if (serpRootsContainMediaSiteLinks(bingRoots)) return true;
     const imdbComposite = bingRoots.map(r => `${r} a[href*="imdb.com/title/"]`).join(', ');
     if (document.querySelector(imdbComposite)) return true;
-    const panelRe = /IMDb|TV series|TV show|Movie\b|Movies\b|Episodes|Episode\b|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original release|Film series|\bSeasons?\s*\d|Watch on\b|Release date|Cast\b/i;
+    /* Entity / infobox cards only — avoid “Cast”, “Genre”, “Release date” matching whole SERP. */
+    const entityPanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Directed by|Film series|\bSeasons?\s*\d|Watch on\b|TV\s*program|Motion picture|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
     const panelSelectors = ['.b_entityTP', '.b_vList', '#b_context', '.b_ans', '.b_canvas', '.b_slideexp', '.scs_arw', '.rich_card', '.mcd', '.ec_item', '.entityContainer', '.b_antiSideBleed', '.b_wpt_sec'];
     for (const sel of panelSelectors) {
       const el = document.querySelector(sel);
-      if (el && panelRe.test(el.innerText)) return true;
+      if (el && entityPanelRe.test(el.innerText)) return true;
     }
-    const strictRe = /IMDb|TV series|TV show|Rotten Tomatoes|Metacritic|Directed by|Running time|Where to watch|Original release|Film series|\bEpisodes?\b.*\bSeason\b|TV\s*program|Motion picture/i;
+    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b|TV\s*program|Motion picture/i;
     for (const sel of ['#b_results', '#b_content', '#ajaxsrwrap', 'main']) {
       const el = document.querySelector(sel);
-      if (el && strictRe.test(el.innerText)) return true;
+      if (el && organicStrictRe.test(el.innerText)) return true;
     }
     return false;
   }
@@ -1321,6 +1384,7 @@
   async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
     const ytsAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
+    const ytsAltAPI = `https://movies-api.accel.li/api/v2/list_movies.json?query_term=`;
     try {
       const existing = getMountTarget().querySelector('.tmdb-info-card');
       if (existing) existing.remove();
@@ -1337,8 +1401,10 @@
       if (result.media_type === 'movie') {
         if (SETTINGS.enableYtsTorrents) {
           try {
-            const magnet = await fetch(`${ytsAPI}${imdb_id}`);
+            const ytsUrl = `${ytsAPI}${imdb_id}`;
+            const magnet = await fetch(ytsUrl);
             const magnetData = await magnet.json();
+            debugNetLog('fetch', ytsUrl, magnet.status, magnetData);
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
               renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language);
             } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }

@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.4` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.5` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
@@ -29,10 +29,10 @@ For **TV shows** specifically, you also get episode controls — pick any season
 |---|---|
 | Google Search | Auto-detects movie/TV searches and injects the info card |
 | Bing Search | Same as Google |
-| DuckDuckGo | Same as Google |
-| Brave Search | Same as Google |
+| DuckDuckGo | Same as Google (not implemented yet) |
+| Brave Search | Same as Google (not implemented yet) |
 | IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
-| Trakt pages | Adds a play icon to the actions bar (or use **Shift+P**) |
+| Trakt pages | Adds a play icon to the actions bar / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) |
 | YTS movie pages | Adds a **Play** button next to the download button |
 
 ---
@@ -42,8 +42,8 @@ For **TV shows** specifically, you also get episode controls — pick any season
 1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser (Chrome, Firefox, Edge, Safari)
 2. Open [`movies-tv-series.user.js`](https://github.com/saad1430/tampermonkey/raw/main/movies-tv-series.user.js) — Tampermonkey will prompt you to install it
 3. Click **Install**
-4. On first run, you'll be asked for a **TMDb API key** — get one free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
-5. Paste your key and hit OK — you're done
+4. On first run, you'll be asked for **TMDb API key(s)** — get one free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
+5. Paste your key (or multiple keys, comma-separated) and hit OK — you're done
 
 
 > You can add multiple API keys (comma-separated) in the settings panel under the **TMDb API keys** section. The script rotates between them automatically, which helps avoid hitting TMDb's rate limits.
@@ -53,7 +53,7 @@ The script includes `@updateURL` and `@downloadURL` headers pointing to this rep
 
 ## Settings
 
-Press **Shift+R** on any supported page (or long-press on mobile) to open the settings panel.
+Press **Shift+R** on any supported page to open the settings panel.
 
 You can also click the **⚙** floating button that appears in the bottom-right corner.
 
