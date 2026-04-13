@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.6` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.7` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
@@ -57,6 +57,8 @@ Press **Shift+R** on any supported page to open the settings panel.
 
 You can also click the **⚙** floating button that appears in the bottom-right corner.
 
+Most settings apply **instantly** (the current info card re-renders on save), so you usually don’t need to refresh the page.
+
 ### Available toggles
 
 | Setting | What it does |
@@ -100,6 +102,8 @@ On Google and Bing, the script scans the page for signs that you're searching fo
 ## For TV shows: changing episodes
 
 When the info card is showing for a TV show, click **"Play another episode"** to reveal season and episode dropdowns. Once you pick your episode and hit **"Update player links"**, all the streaming links in the card update to point directly to that episode. The script validates your choice against the TMDb season data first so you won't get broken links.
+
+Torrent shortcuts that support it (like **Knaben** and **EXT**) will also show an episode-specific search link (e.g. `S03E03`) and update it when you change episodes.
 
 ---
 

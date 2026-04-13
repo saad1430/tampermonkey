@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.6
+// @version      1.7.7
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -179,6 +179,7 @@
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Theme switcher — choose between TMDb, IMDb, Trakt, or a fully custom colour scheme</li>
       <li>Added Knaben and EXT aggregators</li>
+      <li>Settings now apply instantly (no need to reload)</li>
       <li>Minor UI/UX improvements and bug fixes</li>
     </ul>
   `;
@@ -216,6 +217,8 @@
   function saveSettings(s) { GM_setValue('tmdb_settings', JSON.stringify(s)); }
 
   let SETTINGS = loadSettings();
+  let lastInfoCardRender = null; // { data, torrents, imdb, season, episode, ytsLanguage }
+  let lastChangeResultCandidates = null; // array of TMDb search results for "Change result" dropdown
 
   /* Apply theme immediately on load */
   applyTheme(SETTINGS.activeTheme || 'tmdb');
@@ -228,6 +231,87 @@
 
   function linkExternalTabArrow() {
     return SETTINGS.openLinksInNewTab ? ' ↗' : '';
+  }
+
+  function rerenderInfoCardIfPresent() {
+    const existing = document.querySelector('.tmdb-info-card');
+    if (!existing || !lastInfoCardRender) return;
+    try { existing.remove(); } catch (e) { /* ignore */ }
+    try {
+      renderInfoBox(
+        lastInfoCardRender.data,
+        lastInfoCardRender.torrents,
+        lastInfoCardRender.imdb,
+        lastInfoCardRender.season,
+        lastInfoCardRender.episode,
+        lastInfoCardRender.ytsLanguage
+      );
+    } catch (e) { /* ignore */ }
+    try { ensureChangeResultButton(); } catch (e) { /* ignore */ }
+  }
+
+  function ensureChangeResultButton() {
+    // Only meaningful on search result pages (SERP). Prevent stale search candidates from showing on IMDb/Trakt/YTS.
+    const infoCard = getMountTarget().querySelector('.tmdb-info-card');
+    if (!infoCard) return;
+    const detailsDiv = infoCard.querySelector('#tmdb-details');
+    if (!detailsDiv) return;
+    if (!(isGoogle || isBing)) {
+      detailsDiv.querySelector('.tmdb-result-selector')?.remove();
+      detailsDiv.querySelector('#tmdb-change-result-btn')?.remove();
+      return;
+    }
+
+    const existingBtn = detailsDiv.querySelector('#tmdb-change-result-btn');
+    const existingSel = detailsDiv.querySelector('.tmdb-result-selector');
+
+    if (!SETTINGS.enableChangeResultButton || !Array.isArray(lastChangeResultCandidates) || lastChangeResultCandidates.length < 2) {
+      existingSel?.remove();
+      existingBtn?.remove();
+      return;
+    }
+    if (existingBtn) return;
+
+    const results = lastChangeResultCandidates;
+    const changeBtn = document.createElement('button');
+    changeBtn.id = 'tmdb-change-result-btn';
+    changeBtn.className = 'tmdb-btn ghost';
+    changeBtn.style.marginTop = '8px'; changeBtn.style.marginLeft = '5px';
+    changeBtn.textContent = 'Change result';
+
+    const stremioWrapper = detailsDiv.querySelector('a[href^="stremio://detail/"]')?.parentNode || null;
+    if (stremioWrapper) detailsDiv.insertBefore(changeBtn, stremioWrapper);
+    else detailsDiv.appendChild(changeBtn);
+
+    changeBtn.addEventListener('click', () => {
+      const existingSel2 = detailsDiv.querySelector('.tmdb-result-selector');
+      if (existingSel2) { existingSel2.remove(); return; }
+
+      const selWrap = document.createElement('div');
+      selWrap.className = 'tmdb-result-selector';
+      selWrap.style.padding = '10px';
+      selWrap.innerHTML = `<div style="font-weight:bold;margin-bottom:6px">Select a different Search result</div>`;
+
+      const sel = document.createElement('select');
+      sel.style.width = '100%'; sel.style.marginBottom = '8px';
+      results.forEach((r, idx) => {
+        const opt = document.createElement('option');
+        const year = (r.release_date || r.first_air_date || '').slice(0, 4) || '----';
+        opt.value = idx;
+        opt.text = `${(r.media_type || '').toUpperCase()} — ${r.title || r.name} (${year})`;
+        sel.appendChild(opt);
+      });
+
+      sel.addEventListener('change', async () => {
+        const idx = parseInt(sel.value, 10);
+        selWrap.remove();
+        await processSearchResult(results[idx]);
+        ensureChangeResultButton();
+      });
+
+      selWrap.appendChild(sel);
+      detailsDiv.appendChild(selWrap);
+    });
   }
 
   function formatSpecialThanksHtml(forSettingsPanel) {
@@ -875,7 +959,8 @@
       SETTINGS = next;
       saveSettings(SETTINGS);
       applyTheme(SETTINGS.activeTheme);
-      showNotification('Settings saved. Theme applied immediately; reload to re-run auto-detect.', 7000);
+      rerenderInfoCardIfPresent();
+      showNotification('Settings saved & applied.', 4500);
       closeSettingsPanel();
     };
 
@@ -1153,6 +1238,7 @@
     }
 
     const traktUrls = buildTraktAppUrls(vidType, title, date, season_number);
+    lastInfoCardRender = { data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage };
 
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
@@ -1367,6 +1453,7 @@
                     if (hadArrow) a.insertAdjacentHTML('beforeend', linkExternalTabArrow());
                   } catch (ex) { /* ignore */ }
                 });
+                if (lastInfoCardRender) { lastInfoCardRender.season = s; lastInfoCardRender.episode = e; }
                 showNotification(`Player links updated to S${s} E${e}`);
                 updateLinksBtn.textContent = 'Updated';
                 setTimeout(() => { updateLinksBtn.textContent = 'Update player links'; updateLinksBtn.disabled = false; }, 1500);
@@ -1490,61 +1577,8 @@
           if (!rendered && mediaResults.length > 0) rendered = await tryRender(mediaResults[0]);
           if (!rendered) { showNotification('No movie/TV card for this search.'); return false; }
 
-          if (mediaResults.length > 1 && SETTINGS.enableChangeResultButton) {
-            try {
-              const results = mediaResults;
-              function attachChangeButtonToCurrentCard() {
-                try {
-                  const infoCard = getMountTarget().querySelector('.tmdb-info-card');
-                  if (!infoCard) return;
-                  const detailsDiv = infoCard.querySelector('#tmdb-details');
-                  if (!detailsDiv) return;
-                  if (detailsDiv.querySelector('#tmdb-change-result-btn')) return;
-
-                  const changeBtn = document.createElement('button');
-                  changeBtn.id = 'tmdb-change-result-btn';
-                  changeBtn.className = 'tmdb-btn ghost';
-                  changeBtn.style.marginTop = '8px'; changeBtn.style.marginLeft = '5px';
-                  changeBtn.textContent = 'Change result';
-
-                  const stremioWrapper = detailsDiv.querySelector('a[href^="stremio://detail/"]')?.parentNode || null;
-                  if (stremioWrapper) detailsDiv.insertBefore(changeBtn, stremioWrapper);
-                  else detailsDiv.appendChild(changeBtn);
-
-                  changeBtn.addEventListener('click', () => {
-                    const existingSel = detailsDiv.querySelector('.tmdb-result-selector');
-                    if (existingSel) { existingSel.remove(); return; }
-
-                    const selWrap = document.createElement('div');
-                    selWrap.className = 'tmdb-result-selector';
-                    selWrap.style.padding = '10px';
-                    selWrap.innerHTML = `<div style="font-weight:bold;margin-bottom:6px">Select a different TMDb result</div>`;
-
-                    const sel = document.createElement('select');
-                    sel.style.width = '100%'; sel.style.marginBottom = '8px';
-                    results.forEach((r, idx) => {
-                      const opt = document.createElement('option');
-                      const year = (r.release_date || r.first_air_date || '').slice(0, 4) || '----';
-                      opt.value = idx;
-                      opt.text = `${(r.media_type || '').toUpperCase()} — ${r.title || r.name} (${year})`;
-                      sel.appendChild(opt);
-                    });
-
-                    sel.addEventListener('change', async () => {
-                      const idx = parseInt(sel.value, 10);
-                      selWrap.remove();
-                      await processSearchResult(results[idx]);
-                      attachChangeButtonToCurrentCard();
-                    });
-
-                    selWrap.appendChild(sel);
-                    detailsDiv.insertBefore(selWrap, changeBtn.nextSibling);
-                  });
-                } catch (innerErr) { /* ignore */ }
-              }
-              attachChangeButtonToCurrentCard();
-            } catch (e) { /* ignore */ }
-          }
+          lastChangeResultCandidates = mediaResults.length > 1 ? mediaResults : null;
+          ensureChangeResultButton();
           return true;
         }
         showNotification('No results found. Rotating API key...');
