@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.5
+// @version      1.7.6
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -178,10 +178,7 @@
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Theme switcher — choose between TMDb, IMDb, Trakt, or a fully custom colour scheme</li>
-      <li>Fixed auto-detecting on Google and Bing</li>
-      <li>Improved the links updating process</li>
-      <li>Full support for Trakt v3</li>
-      <li>Replaced various streaming sites with new ones</li>
+      <li>Added Knaben and EXT aggregators</li>
       <li>Minor UI/UX improvements and bug fixes</li>
     </ul>
   `;
@@ -1021,6 +1018,45 @@
     try { u = new URL(h); } catch { return href; }
     if (u.protocol === 'stremio:') return href;
     const qs = u.searchParams;
+    const sxe = `s${String(s).padStart(2, '0')}e${String(e).padStart(2, '0')}`;
+
+    // Torrent sites that support season/episode filters
+    if (/^ext\.to$/i.test(u.hostname)) {
+      if (qs.has('name_filter')) {
+        const curRaw = qs.get('name_filter') || '';
+        let cur;
+        try { cur = decodeURIComponent(curRaw); } catch { cur = curRaw; }
+        // If filter is only the token, just swap it; otherwise, only replace a trailing "... sXXeYY"
+        if (/^s\d{1,3}e\d{1,3}$/i.test(cur)) {
+          qs.set('name_filter', sxe);
+          return u.toString();
+        }
+        const tailRe = new RegExp(String.raw`^(.*?)(?:\s+)(s\d{1,3}e\d{1,3})$`, 'i');
+        const m = cur.match(tailRe);
+        if (m) {
+          const next = `${m[1]} ${sxe}`;
+          qs.set('name_filter', next);
+          return u.toString();
+        }
+      }
+    }
+    if (/^knaben\.org$/i.test(u.hostname)) {
+      // /search/<query>/<category>/1/seeders — update only if the query already includes an SxxExx token
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'search' && parts[1]) {
+        const decoded = decodeURIComponent(parts[1]);
+        // Replace ONLY the trailing "... sXXeYY" token we append (avoid touching titles containing similar patterns)
+        const tailRe = new RegExp(String.raw`^(.*?)(?:\s+)(s\d{1,3}e\d{1,3})$`, 'i');
+        const m = decoded.match(tailRe);
+        if (m) {
+          const nextDecoded = `${m[1]} ${sxe}`;
+          parts[1] = encodeURIComponent(nextDecoded);
+          u.pathname = `/${parts.join('/')}`;
+          return u.toString();
+        }
+      }
+    }
+
     if (qs.has('s') && qs.has('e')) { qs.set('s', String(s)); qs.set('e', String(e)); return u.toString(); }
     const idEsc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pathRe = new RegExp(`(/${idEsc})/(\\d+)/(\\d+)(?=(?:/|$))`);
@@ -1079,13 +1115,18 @@
     let multiQuery = '';
     let html = '';
     let eztv = '';
+    let knabenCategory = '';
+    let extCategory = '';
     let season_number = specifiedSeason ? Number(specifiedSeason) : 1;
     let episode_number = specifiedEpisode ? Number(specifiedEpisode) : 1;
+    let sxe = '';
     let torrentLinks = [];
 
     if (Type === 'movie') {
       vidType = 'movie';
       vidType1337 = 'Movies';
+      knabenCategory = '3000000';
+      extCategory = '1';
       if (SETTINGS.enableYtsTorrents && torrents) {
         torrentLinks = buildTorrentLinks(torrents, title);
         if (torrentLinks?.length) {
@@ -1098,9 +1139,12 @@
       }
     } else if (Type === 'tv') {
       vidType = 'tv'; vidType1337 = 'TV'; ET_cat = '2';
+      knabenCategory = '2000000';
+      extCategory = '2';
       query = `/${season_number}/${episode_number}`;
       smashQuery = `?s=${season_number}&e=${episode_number}`;
       multiQuery = `&s=${season_number}&e=${episode_number}`;
+      sxe = `s${String(season_number).padStart(2, '0')}e${String(episode_number).padStart(2, '0')}`;
       if (SETTINGS.enableTorrentSiteShortcuts && imdb) {
         eztv = `<a href="https://eztvx.to/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>EZTVx.to${linkExternalTabArrow()}</a> - <a href="https://eztv1.xyz/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://eztv.yt/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`;
       }
@@ -1168,6 +1212,8 @@
           <a href="https://x1337x.cc/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>
           ${eztv}
           <a href="https://www.limetorrents.fun/search/${vidType1337}/${title}" ${linkTargetAttr()} ${accentStyle()}>LimeTorrents.fun${linkExternalTabArrow()}</a><br/>
+          <a href="https://knaben.org/search/${encodeURIComponent(title)}/${knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>Knaben.org${linkExternalTabArrow()}</a>${Type === "tv" ? ` - <a data-tm-sxe-link="1" href="https://knaben.org/search/${encodeURIComponent(`${title} ${sxe}`)}/${knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>${sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>
+          <a href="https://ext.to/browse/?with_adult=1&cat=${extCategory}${imdb ? `&imdb_id=${imdb}` : `&name_filter=${encodeURIComponent(title)}`}" ${linkTargetAttr()} ${accentStyle()}>Ext.to${linkExternalTabArrow()}</a>${Type === "tv" ? ` - <a data-tm-sxe-link="1" href="https://ext.to/browse/?with_adult=1&cat=${extCategory}${imdb ? `&imdb_id=${imdb}&name_filter=${sxe}` : `&name_filter=${encodeURIComponent(`${title} ${sxe}`)}`}" ${linkTargetAttr()} ${accentStyle()}>${sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>
           <a href="https://thepiratebay.org/search.php?q=${title}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} ${accentStyle()}>ThePirateBay.org${linkExternalTabArrow()}</a><br/>
           <a href="https://extratorrent.st/search/?new=1&search=${title}&s_cat=${ET_cat}" ${linkTargetAttr()} ${accentStyle()}>ExtraTorrent.st${linkExternalTabArrow()}</a><br/>
           <a href="https://rutor.is/search/${title}" ${linkTargetAttr()} ${accentStyle()}>Rutor.is${linkExternalTabArrow()}</a><br/>
@@ -1309,6 +1355,16 @@
                     if (!orig) { orig = a.getAttribute('href') || ''; a.dataset.originalHref = orig; }
                     if (!orig) return;
                     a.setAttribute('href', rewritePlayerLinkHref(orig, tmdbID, s, e));
+                  } catch (ex) { /* ignore */ }
+                });
+                // Update visible SxxExx labels that are rendered as link text (torrent shortcuts)
+                const sxeUpper = `S${String(s).padStart(2, '0')}E${String(e).padStart(2, '0')}`;
+                detailsDiv.querySelectorAll('a[data-tm-sxe-link="1"]').forEach(a => {
+                  try {
+                    // Preserve the external-tab arrow if present in HTML
+                    const hadArrow = /↗|&nbsp;|<svg|external/i.test(a.innerHTML);
+                    a.textContent = sxeUpper;
+                    if (hadArrow) a.insertAdjacentHTML('beforeend', linkExternalTabArrow());
                   } catch (ex) { /* ignore */ }
                 });
                 showNotification(`Player links updated to S${s} E${e}`);
