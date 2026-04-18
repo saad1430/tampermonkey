@@ -1,14 +1,14 @@
 # Movie/TV Shows Links Aggregator
 
-> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google/Bing search results, IMDb, Trakt, or YTS pages.
+> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google, Bing, or DuckDuckGo search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.7` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.8` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
 ## What does it do?
 
-When you search for a movie or TV show on Google or Bing, the script automatically detects it and adds a card to your results with everything you need in one place:
+When you search for a movie or TV show on **Google** or **Bing**, the script can automatically detect it and add a card to your results with everything you need in one place. On **DuckDuckGo**, use the **Search Movie/TV Info** button to fetch the same card (automatic detection is not wired up for DDG yet).
 
 - **TMDb & IMDb IDs** — click to copy either one instantly
 - **Streaming links** — a curated list of working players, updated regularly. CineSrc.st also supports direct download, shown inline next to its watch link
@@ -29,11 +29,12 @@ For **TV shows** specifically, you also get episode controls — pick any season
 |---|---|
 | Google Search | Auto-detects movie/TV searches and injects the info card |
 | Bing Search | Same as Google |
-| DuckDuckGo | Same as Google (not implemented yet) |
-| Brave Search | Same as Google (not implemented yet) |
+| DuckDuckGo | Injects **Search Movie/TV Info** — click it to load the card (no Google/Bing-style auto-detect yet) |
+| Brave Search | Script is allowed on the domain (settings FAB only; SERP card flow not active yet) |
 | IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
-| Trakt pages | Adds a play icon to the actions bar / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) |
-| YTS movie pages | Adds a **Play** button next to the download button |
+| Trakt (`trakt.tv`, `app.trakt.tv`, season/episode URLs) | Adds a play control / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) — improved v3 layout support |
+| SIMKL & TMDb title pages (`simkl.com`, `themoviedb.org`) | Matched for upcoming integration; in-app links are being expanded |
+| YTS movie pages (`yts.mx`, `yts.lt`, `yts.bz`, …) | Adds a **Play** button next to the download button |
 
 ---
 
@@ -64,7 +65,8 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Setting | What it does |
 |---|---|
 | Auto-detect Movies/TV | Automatically shows the card when a media search is detected |
-| Google / Bing / IMDb / Trakt / YTS support | Turn the script on or off per site |
+| Google / Bing / IMDb / Trakt / YTS support | Turn the script on or off per supported site |
+| Debug network requests | Logs TMDb requests to the browser console (for troubleshooting) |
 | Streaming links | The main list of watch links |
 | Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
 | Torrent sites | 1337x, EZTV, LimeTorrents, TPB, etc. |
@@ -76,7 +78,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Allow changing episode number | Shows season/episode selectors for TV shows |
 | Watch trailer button | Plays the official trailer in an in-page popup |
 | Autoplay trailer | Auto-starts the trailer when opened (mind your volume) |
-| Change result button | Lets you pick a different TMDb result if the first one is wrong |
+| Change result button | Lets you pick a different TMDb result if the first one is wrong (Google/Bing search only) |
 | Certification | Displays the content rating (e.g. PG-13, TV-MA) |
 | Transparency/Glassy mode | Makes modals and panels use a frosted-glass look |
 | Theme | Switch between **TMDb**, **IMDb**, **Trakt**, or a **Custom** colour scheme |
@@ -95,7 +97,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 
 ## How the auto-detect works
 
-On Google and Bing, the script scans the page for signs that you're searching for a movie or TV show — things like JSON-LD schema data, links to IMDb/TMDb/Rotten Tomatoes, and knowledge panel keywords. If it finds a match, the info card appears automatically. If it doesn't auto-detect, a **"Search Movie/TV Info"** button will appear at the top of results that you can click manually.
+On **Google** and **Bing**, the script scans the page for signs that you're searching for a movie or TV show — things like JSON-LD schema data, links to IMDb/TMDb/Rotten Tomatoes, and knowledge-panel-style keywords. If it finds a match, the info card appears automatically. If it doesn't auto-detect, a **"Search Movie/TV Info"** button appears at the top of results. On **DuckDuckGo**, that manual button is always how you open the card for your current query.
 
 ---
 
@@ -112,6 +114,8 @@ Torrent shortcuts that support it (like **Knaben** and **EXT**) will also show a
 The script constructs links to third-party streaming sites — it does not host any content itself. Some sites may not have every title. Availability varies by region. Use in accordance with the laws in your country.
 
 For **torrents**, YTS magnet links are fetched live and include quality, file size, codec, audio channel info, and seeder/peer counts so you can make an informed choice before downloading.
+
+> **Notice:** I am **not affiliated with, endorsed by, or otherwise linked to** any of the third-party sites or services whose URLs this script shows. I **only aggregate links** to pages that already exist on the public web; this project does not host, upload, or distribute any audio or video. If you have a **copyright or DMCA** issue, please contact the **actual site** that hosts or serves the content — that operator is the right party to speak to, not this repository or its author.
 
 ---
 
@@ -150,13 +154,18 @@ These are personal backups and not actively maintained or documented.
 
 ## Contributing
 
-Pull requests are welcome. If you're fixing a bug or updating a streaming site, please keep the userscript `@version` bumped and describe your changes clearly in the PR.
+**Thank you** to everyone who has already chipped in, and to anyone thinking about it: open-source maintenance is genuinely hard for a solo author — streaming sites change URLs, search engines tweak their markup, and Trakt or IMDb revamp a page overnight. **Your contributions help keep this script useful for the whole community**, whether that is a one-line fix, a new `@match`, a clearer README note, or a careful review of someone else’s PR.
+
+Pull requests are welcome. If you are fixing a bug, refreshing a dead link, or adapting to a layout change, please bump the userscript `@version` and describe what you changed and why in the PR so updates are easy to follow. If you are not sure where to start, open an issue with what you observed (page URL, screenshot, or console error) — that alone saves a lot of debugging time.
+
+Issues and small PRs are equally valued. Maintainers here are **you**: the people who use the script and are willing to share a patch or a reproducible report.
 
 ---
 
 ## Special Thanks
 
-[FMHY](https://fmhy.net)
+- [FMHY](https://fmhy.net)
+- Everyone who [stars the repo](https://github.com/saad1430/tampermonkey)
 
 ---
 

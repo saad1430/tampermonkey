@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.7
+// @version      1.7.8
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -23,6 +23,10 @@
 // @match        https://app.trakt.tv/shows/*
 // @match        https://app.trakt.tv/shows/*/seasons/*
 // @match        https://app.trakt.tv/shows/*/seasons/*/episodes/*
+// @match        https://simkl.com/tv/*
+// @match        https://simkl.com/movies/*
+// @match        https://themoviedb.org/movie/*
+// @match        https://themoviedb.org/tv/*
 // @match        https://yts.lt/movies/*
 // @match        https://yts.bz/movies/*
 // @match        https://yts.mx/movies/*
@@ -177,9 +181,8 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Theme switcher — choose between TMDb, IMDb, Trakt, or a fully custom colour scheme</li>
-      <li>Added Knaben and EXT aggregators</li>
-      <li>Settings now apply instantly (no need to reload)</li>
+      <li>Improved Trakt v3 support</li>
+      <li>Added TMDb and SIMKL links (support coming soon)</li>
       <li>Minor UI/UX improvements and bug fixes</li>
     </ul>
   `;
@@ -1772,7 +1775,66 @@
   * Trakt Page Handler
   * -------------------------------------------------- */
   const traktCache = new Map();
-  let traktBindingsInstalled = false;
+  /** Bound overlay payload for the current Trakt URL (SPA updates this on navigation). */
+  let traktOverlayPayloadRef = null;
+  /** pathname+search we last successfully bound; reset when Trakt SPA navigates. */
+  let lastTraktBindKey = '';
+  let traktSpaHooksInstalled = false;
+  let traktGlobalKeydownInstalled = false;
+  let traktAppHintShown = false;
+
+  function traktBindKey() {
+    return `${location.pathname}${location.search}`;
+  }
+
+  function removeTraktInjections() {
+    document.getElementById('tmdb-trakt-summary-play')?.remove();
+    document.getElementById('tmdb-trakt-play')?.remove();
+    document.querySelector('.tmdb-overlay')?.remove();
+  }
+
+  function installTraktGlobalKeydownOnce() {
+    if (traktGlobalKeydownInstalled) return;
+    traktGlobalKeydownInstalled = true;
+    document.addEventListener('keydown', (e) => {
+      if (!e.shiftKey || e.key.toLowerCase() !== 'p') return;
+      if (!isTrakt || !SETTINGS.enableOnTraktPage) return;
+      const ov = document.querySelector('.tmdb-overlay');
+      if (ov) {
+        ov.remove();
+        return;
+      }
+      const ids = traktOverlayPayloadRef || extractTraktPageIds();
+      if (ids.imdb || (ids.tmdb && ids.type)) void triggerTraktOverlay(ids);
+      else showNotification('No IMDb title link on this Trakt page yet — wait for the page to finish loading.');
+    });
+  }
+
+  /** Re-run Trakt binding after app.trakt.tv client-side navigation (no full reload). */
+  function installTraktSpaNavigationHooks(scheduleRebind) {
+    if (traktSpaHooksInstalled) return;
+    traktSpaHooksInstalled = true;
+    let rebindT = 0;
+    const onNav = () => {
+      if (rebindT) clearTimeout(rebindT);
+      rebindT = setTimeout(() => {
+        rebindT = 0;
+        lastTraktBindKey = '';
+        traktOverlayPayloadRef = null;
+        removeTraktInjections();
+        scheduleRebind();
+      }, 150);
+    };
+    window.addEventListener('popstate', onNav);
+    const wrap = (fn) =>
+      function () {
+        const ret = fn.apply(this, arguments);
+        onNav();
+        return ret;
+      };
+    history.pushState = wrap(history.pushState);
+    history.replaceState = wrap(history.replaceState);
+  }
 
   function scrapeTraktNextDataTmdb() {
     const el = document.getElementById('__NEXT_DATA__');
@@ -1931,19 +1993,14 @@
 
   function bindTraktOverlayToPage(ids) {
     const payload = { imdb: ids.imdb, tmdb: ids.tmdb, type: ids.type, season: ids.season, episode: ids.episode };
+    traktOverlayPayloadRef = payload;
+    installTraktGlobalKeydownOnce();
+
     const toggleOverlay = () => {
       const ov = document.querySelector('.tmdb-overlay');
       if (ov) { ov.remove(); return; }
-      void triggerTraktOverlay(payload);
+      void triggerTraktOverlay(traktOverlayPayloadRef || payload);
     };
-
-    document.addEventListener('keydown', (e) => {
-      if (e.shiftKey && e.key.toLowerCase() === 'p') {
-        const ov = document.querySelector('.tmdb-overlay');
-        if (ov) ov.remove();
-        else void triggerTraktOverlay(payload);
-      }
-    });
 
     scheduleTraktSummaryPlayButton(toggleOverlay);
 
@@ -1951,9 +2008,12 @@
     const watchBtn = findTraktWatchTrigger();
     if (!isAppTrakt && watchBtn) {
       showNotification('Trakt "Watch" opens this script\'s overlay; Shift+P toggles it.', 3500);
-      watchBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopImmediatePropagation(); void triggerTraktOverlay(payload); }, true);
+      watchBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopImmediatePropagation(); void triggerTraktOverlay(traktOverlayPayloadRef || payload); }, true);
     } else if (isAppTrakt) {
-      showNotification('▶ next to the watched checkmark toggles TMDb streaming links. Shift+P too.', 4500);
+      if (!traktAppHintShown) {
+        traktAppHintShown = true;
+        showNotification('▶ next to the watched checkmark toggles TMDb streaming links. Shift+P too.', 4500);
+      }
     } else if (!watchBtn) {
       showNotification('Use the top "Streaming links" button or Shift+P when the action bar is slow to load.', 4500);
     }
@@ -1961,42 +2021,61 @@
 
   function traktPageHandler() {
     let traktMo = null;
-    const stopMo = () => { try { traktMo?.disconnect(); } catch (e) { /* ignore */ } };
+    let moStopTimer = 0;
+    let traktRebindGen = 0;
+    const stopMo = () => {
+      try { traktMo?.disconnect(); } catch (e) { /* ignore */ }
+      traktMo = null;
+      if (moStopTimer) { clearTimeout(moStopTimer); moStopTimer = 0; }
+    };
+
+    const armMutationObserver = (durationMs) => {
+      stopMo();
+      let traktMoRaf = 0;
+      traktMo = new MutationObserver(() => {
+        if (traktMoRaf) return;
+        traktMoRaf = requestAnimationFrame(() => { traktMoRaf = 0; tryBind(); });
+      });
+      traktMo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
+      moStopTimer = setTimeout(stopMo, durationMs);
+    };
 
     const tryBind = () => {
-      if (traktBindingsInstalled) return true;
+      const key = traktBindKey();
+      if (lastTraktBindKey === key) return true;
       const ids = extractTraktPageIds();
       if (!ids.imdb && (!ids.tmdb || !ids.type)) return false;
-      traktBindingsInstalled = true; stopMo();
+      if (lastTraktBindKey) removeTraktInjections();
+      lastTraktBindKey = key;
+      stopMo();
       bindTraktOverlayToPage(ids);
       return true;
     };
 
-    let traktMoRaf = 0;
-    traktMo = new MutationObserver(() => {
-      if (traktMoRaf) return;
-      traktMoRaf = requestAnimationFrame(() => { traktMoRaf = 0; tryBind(); });
-    });
-    traktMo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
-    setTimeout(stopMo, 35000);
-
-    let tries = 0; const maxTries = 45;
-    const tick = () => {
-      if (tryBind()) return;
-      if (++tries >= maxTries) {
-        stopMo();
-        document.addEventListener('keydown', (e) => {
-          if (!e.shiftKey || e.key.toLowerCase() !== 'p') return;
-          const ids = extractTraktPageIds();
-          if (ids.imdb || (ids.tmdb && ids.type)) void triggerTraktOverlay(ids);
-          else showNotification('No IMDb title link on this Trakt page yet — wait for the page to finish loading.');
-        });
-        showNotification('TMDb Enhancer: Waiting for Trakt\'s IMDb link — try Shift+P shortly.', 5500);
-        return;
-      }
-      setTimeout(tick, 400);
+    const scheduleRebind = () => {
+      const gen = ++traktRebindGen;
+      lastTraktBindKey = '';
+      traktOverlayPayloadRef = null;
+      armMutationObserver(35000);
+      let tries = 0;
+      const maxTries = 45;
+      const tick = () => {
+        if (gen !== traktRebindGen) return;
+        if (tryBind()) return;
+        if (++tries >= maxTries) {
+          if (gen !== traktRebindGen) return;
+          stopMo();
+          installTraktGlobalKeydownOnce();
+          showNotification('TMDb Enhancer: Waiting for Trakt\'s IMDb link — try Shift+P shortly.', 5500);
+          return;
+        }
+        setTimeout(tick, 400);
+      };
+      tick();
     };
-    tick();
+
+    installTraktSpaNavigationHooks(scheduleRebind);
+    scheduleRebind();
   }
 
   async function triggerTraktOverlay({ imdb, tmdb, type, season = null, episode = null }) {
