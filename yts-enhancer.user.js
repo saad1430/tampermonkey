@@ -6,6 +6,8 @@
 // @description  Make YTS feel better and easier to use! This script adds aesthetic CSS improvements, smarter pagination navigation, visual highlighting on the navbar to show your current section, and customizable options so you can tweak it exactly how you want.
 // @match        https://yts.bz/*
 // @icon         https://yts.bz/assets/images/website/favicon.ico
+// @updateURL    https://github.com/saad1430/tampermonkey/raw/main/yts-enhancer.user.js
+// @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/yts-enhancer.user.js
 // @run-at       document-start
 // @grant        GM_addStyle
 // @grant        GM_getValue

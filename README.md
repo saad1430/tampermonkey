@@ -147,6 +147,7 @@ This repo also contains a few personal-use scripts:
 - `twitch-drop-claim.user.js` — Auto-claims Twitch drops on the inventory page
 - `swiftuploads-download-automation.user.js` — Download automation for SwiftUploads
 - `yts-enhancer.user.js` — Extra enhancements for YTS pages
+- `daily-visit-manager.user.js` — Opens configured URLs once per day after your first click or keypress on any page; manage the list, domain vs exact URL matching, and a pause timer from a floating panel
 
 These are personal backups and not actively maintained or documented.
 

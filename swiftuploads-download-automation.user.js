@@ -5,6 +5,8 @@
 // @description  Auto-submit all SwiftUploads steps & auto-click final download (new 2025 system)
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/swiftuploads-automation-100.png
 // @author       Saad1430
+// @updateURL    https://github.com/saad1430/tampermonkey/raw/main/swiftuploads-download-automation.user.js
+// @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/swiftuploads-download-automation.user.js
 // @match        https://swiftuploads.com/*
 // @match        https://www.swiftuploads.com/*
 // @grant        none

@@ -4,6 +4,8 @@
 // @version      1.5.1
 // @description  Automates Bing searches with human-like delays. Keybinds + notifications + clean Bing-styled status badge included.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/bing-automation-100.png
+// @updateURL    https://github.com/saad1430/tampermonkey/raw/main/bing-search-automation.user.js
+// @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/bing-search-automation.user.js
 // @author       Saad1430
 // @match        https://www.bing.com/*
 // @grant        none

@@ -4,6 +4,8 @@
 // @version      1.4.1
 // @description  Auto claims Twitch drops reliably + refreshes page every 5 mins
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/twitch-automation-100.png
+// @updateURL    https://github.com/saad1430/tampermonkey/raw/main/twitch-drop-claim.user.js
+// @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/twitch-drop-claim.user.js
 // @author       Saad1430
 // @match        https://www.twitch.tv/drops/inventory
 // @grant        none
