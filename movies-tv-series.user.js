@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.9
+// @version      1.7.10
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -183,6 +183,7 @@
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Added Brave Search support</li>
+      <li>Improved Automatic Media Detection</li>
     </ul>
   `;
 
@@ -1029,7 +1030,6 @@
 
   function serpRootsContainMediaSiteLinks(rootSelectors) {
     const anchorSel = [
-      'a[href*="imdb.com/title/"]',
       'a[href*="themoviedb.org/movie/"]', 'a[href*="themoviedb.org/tv/"]',
       'a[href*="rottentomatoes.com/m/"]', 'a[href*="rottentomatoes.com/tv/"]',
       'a[href*="metacritic.com/movie/"]', 'a[href*="metacritic.com/tv/"]',
@@ -1059,17 +1059,17 @@
     if (serpHasMovieTvJsonLd()) return true;
     if (serpHasSchemaMicrodata()) return true;
     if (serpRootsContainMediaSiteLinks(['#search', '#rso', '#main', '#center_col', '#rhs', '#rhs_col'])) return true;
-    const imdbAnchors = '#search a[href*="imdb.com/title/"], #rso a[href*="imdb.com/title/"], #main a[href*="imdb.com/title/"], #center_col a[href*="imdb.com/title/"], #rhs a[href*="imdb.com/title/"], #rhs_col a[href*="imdb.com/title/"]';
-    if (document.querySelector(imdbAnchors)) return true;
     /* Loose text: knowledge panel only — #center_col / #rso are full results and match people, games, etc. */
     /* No standalone \bMovie(s)\b — geo/topic panels use “Movies” for unrelated lists. */
-    const knowledgePanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Genre:|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
+    // Knowledge/infobox panels: only trigger on "movie/TV" specific fields.
+    // Avoid generic entity fields that also exist on games/songs/people (e.g. "Original release", brand names).
+    const knowledgePanelRe = /\bTV series\b|\bTV show\b|Run time|Running time|Where to watch|Watch on\b|Original network|Film series|\bSeasons?\s*\d|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
     for (const sel of ['#rhs', '#rhs_col']) {
       const el = document.querySelector(sel);
       if (el && knowledgePanelRe.test(el.innerText)) return true;
     }
     /* Organic + main: stricter — drop Metacritic text (games use Metacritic too) and vague “Original release”. */
-    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    const organicStrictRe = /\bTV series\b|\bTV show\b|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
     for (const sel of ['#center_col', '#rso', '#main', '#search']) {
       const el = document.querySelector(sel);
       if (el && organicStrictRe.test(el.innerText)) return true;
@@ -1084,16 +1084,15 @@
     if (serpHasSchemaMicrodata()) return true;
     const bingRoots = ['#b_results', '#b_context', '#b_content', '#results', '#ajaxsrwrap', 'main[role="main"]', 'main', '[role="main"]'];
     if (serpRootsContainMediaSiteLinks(bingRoots)) return true;
-    const imdbComposite = bingRoots.map(r => `${r} a[href*="imdb.com/title/"]`).join(', ');
-    if (document.querySelector(imdbComposite)) return true;
     /* Entity / infobox cards only — avoid “Cast”, “Genre”, “Release date” matching whole SERP. */
-    const entityPanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Directed by|Film series|\bSeasons?\s*\d|Watch on\b|TV\s*program|Motion picture|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    // Infobox/entity cards: require "movie/TV" specific fields (avoid triggering from brand names on games/songs/people).
+    const entityPanelRe = /\bTV series\b|\bTV show\b|Run time|Running time|Where to watch|Watch on\b|Film series|\bSeasons?\s*\d|TV\s*program|Motion picture|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
     const panelSelectors = ['.b_entityTP', '.b_vList', '#b_context', '.b_ans', '.b_canvas', '.b_slideexp', '.scs_arw', '.rich_card', '.mcd', '.ec_item', '.entityContainer', '.b_antiSideBleed', '.b_wpt_sec'];
     for (const sel of panelSelectors) {
       const el = document.querySelector(sel);
       if (el && entityPanelRe.test(el.innerText)) return true;
     }
-    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b|TV\s*program|Motion picture/i;
+    const organicStrictRe = /\bTV series\b|\bTV show\b|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b|TV\s*program|Motion picture/i;
     for (const sel of ['#b_results', '#b_content', '#ajaxsrwrap', 'main']) {
       const el = document.querySelector(sel);
       if (el && organicStrictRe.test(el.innerText)) return true;
@@ -1110,14 +1109,12 @@
     const braveRoots = ['#results', 'main[role="main"]', 'main', '[role="main"]'];
     if (serpRootsContainMediaSiteLinks(braveRoots)) return true;
 
-    const imdbAnchors = braveRoots.map(r => `${r} a[href*="imdb.com/title/"]`).join(', ');
-    if (document.querySelector(imdbAnchors)) return true;
-
     const resultsRoot = document.getElementById('results') || document.querySelector('main') || document.body;
-    const knowledgePanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
+    // Knowledge/infobox panels: only trigger on "movie/TV" specific fields.
+    const knowledgePanelRe = /\bTV series\b|\bTV show\b|Run time|Running time|Where to watch|Original network|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
     if (knowledgePanelRe.test(resultsRoot.innerText)) return true;
 
-    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    const organicStrictRe = /\bTV series\b|\bTV show\b|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
     return organicStrictRe.test(resultsRoot.innerText);
   }
 
