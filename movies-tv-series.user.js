@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.8
+// @version      1.7.9
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -142,6 +142,7 @@
     autoDetectOnSERP: true,
     enableOnGooglePage: true,
     enableOnBingPage: true,
+    enableOnBravePage: true,
     enableOnImdbPage: true,
     enableOnTraktPage: true,
     enableOnYTSPage: true,
@@ -181,9 +182,7 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Improved Trakt v3 support</li>
-      <li>Added TMDb and SIMKL links (support coming soon)</li>
-      <li>Minor UI/UX improvements and bug fixes</li>
+      <li>Added Brave Search support</li>
     </ul>
   `;
 
@@ -696,13 +695,14 @@
   const hostname = location.hostname;
   const isGoogle = hostname.includes('google.');
   const isBing = hostname.includes('bing.com');
+  const isBrave = hostname.includes('search.brave.com');
   const isDuckDuckGo = hostname.includes('duckduckgo.com');
   const isImdb = hostname.includes('imdb.com');
   const isTrakt = hostname.includes('trakt.tv');
   const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.bz') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
 
   function isSearch() {
-    if (isGoogle || isBing || isDuckDuckGo) return true;
+    if (isGoogle || isBing || isBrave || isDuckDuckGo) return true;
   }
 
   function getSearchQuery() {
@@ -721,6 +721,7 @@
       if (fromDom) return fromDom;
       return null;
     }
+    if (isBrave) return params.get('q') || params.get('query') || params.get('search') || null;
     if (isDuckDuckGo) return params.get('q');
     return null;
   }
@@ -739,6 +740,7 @@
         || document.querySelector('#b_results')
         || document.body;
     }
+    if (isBrave) return document.getElementById('results') || document.body;
     if (isDuckDuckGo) return document.querySelector('.results--main') || document.body;
     return document.body;
   }
@@ -761,6 +763,12 @@
     if (isGoogle) {
       const u = document.getElementById('search')
         || document.querySelector('form[role="search"]')?.closest('div')
+        || (parent?.isConnected ? parent : null)
+        || document.body;
+      return u?.isConnected ? u : document.body;
+    }
+    if (isBrave) {
+      const u = document.getElementById('results')
         || (parent?.isConnected ? parent : null)
         || document.body;
       return u?.isConnected ? u : document.body;
@@ -860,6 +868,7 @@
           ${checkbox('autoDetectOnSERP', 'Auto-detect Movies/TV Shows', SETTINGS.autoDetectOnSERP)}
           ${checkbox('enableOnGooglePage', 'Google support', SETTINGS.enableOnGooglePage)}
           ${checkbox('enableOnBingPage', 'Bing support', SETTINGS.enableOnBingPage)}
+          ${checkbox('enableOnBravePage', 'Brave support', SETTINGS.enableOnBravePage)}
           ${checkbox('enableOnImdbPage', 'IMDB support', SETTINGS.enableOnImdbPage)}
           ${checkbox('enableOnTraktPage', 'Trakt support', SETTINGS.enableOnTraktPage)}
           ${checkbox('enableOnYTSPage', 'YTS support', SETTINGS.enableOnYTSPage)}
@@ -1092,9 +1101,30 @@
     return false;
   }
 
+  function scanBraveForMediaHints() {
+    if (!isBrave || !SETTINGS.enableOnBravePage) return false;
+    if (serpQueryLooksLikeNonMediaLookup(getSearchQuery())) return false;
+    if (serpHasMovieTvJsonLd()) return true;
+    if (serpHasSchemaMicrodata()) return true;
+
+    const braveRoots = ['#results', 'main[role="main"]', 'main', '[role="main"]'];
+    if (serpRootsContainMediaSiteLinks(braveRoots)) return true;
+
+    const imdbAnchors = braveRoots.map(r => `${r} a[href*="imdb.com/title/"]`).join(', ');
+    if (document.querySelector(imdbAnchors)) return true;
+
+    const resultsRoot = document.getElementById('results') || document.querySelector('main') || document.body;
+    const knowledgePanelRe = /IMDb|TV series|TV show|Run time|Running time|Rotten Tomatoes|Metacritic|Where to watch|Starring|Directed by|Original network|Original release|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
+    if (knowledgePanelRe.test(resultsRoot.innerText)) return true;
+
+    const organicStrictRe = /IMDb|Rotten Tomatoes|\bTV series\b|\bTV show\b|Directed by|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    return organicStrictRe.test(resultsRoot.innerText);
+  }
+
   function serpLooksLikeMedia() {
     if (isGoogle && SETTINGS.enableOnGooglePage) return scanGoogleForMediaHints();
     if (isBing && SETTINGS.enableOnBingPage) return scanBingForMediaHints();
+    if (isBrave && SETTINGS.enableOnBravePage) return scanBraveForMediaHints();
     return false;
   }
 
@@ -2171,29 +2201,49 @@
     }
 
     if (SETTINGS.autoDetectOnSERP && serpLooksLikeMedia()) {
-      void runSerpAutoFetchOnce();
+      // Brave results can re-render after load; delay the fetch a bit so the injected card survives.
+      if (isBrave && SETTINGS.enableOnBravePage) {
+        setTimeout(() => void runSerpAutoFetchOnce(), 2200);
+      } else {
+        void runSerpAutoFetchOnce();
+      }
     } else {
       ensureSerpManualButton();
     }
 
     if (SETTINGS.autoDetectOnSERP && !serpAutoFetchTriggered) {
       const isBingSerp = isBing && SETTINGS.enableOnBingPage;
+      const isBraveSerp = isBrave && SETTINGS.enableOnBravePage;
       const moRoot = isGoogle && SETTINGS.enableOnGooglePage
         ? (document.getElementById('main') || document.body)
-        : isBingSerp ? document.body : null;
+        : isBingSerp ? document.body
+          : isBraveSerp ? (document.getElementById('results') || document.body)
+            : null;
       if (moRoot) {
         let moRaf = 0;
+        let braveDebounce = 0;
         const scheduleSerpTry = () => {
+          if (isBraveSerp) {
+            if (braveDebounce) clearTimeout(braveDebounce);
+            // Wait for Brave's DOM to settle before injecting the card.
+            braveDebounce = setTimeout(() => { braveDebounce = 0; void runSerpAutoFetchOnce(); }, 1700);
+            return;
+          }
           if (moRaf) return;
           moRaf = requestAnimationFrame(() => { moRaf = 0; void runSerpAutoFetchOnce(); });
         };
         const mo = new MutationObserver(scheduleSerpTry);
         mo.observe(moRoot, { childList: true, subtree: true });
-        const observeMs = isBingSerp ? 25000 : 15000;
+        const observeMs = isBingSerp ? 25000 : isBraveSerp ? 35000 : 15000;
         setTimeout(() => { try { mo.disconnect(); } catch (e) { /* ignore */ } }, observeMs);
         scheduleSerpTry();
-        setTimeout(() => void runSerpAutoFetchOnce(), 400);
-        setTimeout(() => void runSerpAutoFetchOnce(), 2000);
+        if (isBraveSerp) {
+          setTimeout(() => void runSerpAutoFetchOnce(), 2600);
+          setTimeout(() => void runSerpAutoFetchOnce(), 7500);
+        } else {
+          setTimeout(() => void runSerpAutoFetchOnce(), 400);
+          setTimeout(() => void runSerpAutoFetchOnce(), 2000);
+        }
         if (isBingSerp) {
           setTimeout(() => void runSerpAutoFetchOnce(), 5000);
           setTimeout(() => void runSerpAutoFetchOnce(), 9000);
@@ -2201,10 +2251,16 @@
       }
     }
 
-    if (isBing && SETTINGS.enableOnBingPage) {
-      setTimeout(() => ensureSerpManualButton(), 150);
-      setTimeout(() => ensureSerpManualButton(), 900);
-      setTimeout(() => ensureSerpManualButton(), 2500);
+    if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage)) {
+      if (isBrave && SETTINGS.enableOnBravePage) {
+        setTimeout(() => ensureSerpManualButton(), 2800);
+        setTimeout(() => ensureSerpManualButton(), 8000);
+        setTimeout(() => ensureSerpManualButton(), 15000);
+      } else {
+        setTimeout(() => ensureSerpManualButton(), 150);
+        setTimeout(() => ensureSerpManualButton(), 900);
+        setTimeout(() => ensureSerpManualButton(), 2500);
+      }
     }
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
     imdbHandler();

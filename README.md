@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google, Bing, or DuckDuckGo search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.8` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.9` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
 
 ---
 
@@ -30,7 +30,7 @@ For **TV shows** specifically, you also get episode controls — pick any season
 | Google Search | Auto-detects movie/TV searches and injects the info card |
 | Bing Search | Same as Google |
 | DuckDuckGo | Injects **Search Movie/TV Info** — click it to load the card (no Google/Bing-style auto-detect yet) |
-| Brave Search | Script is allowed on the domain (settings FAB only; SERP card flow not active yet) |
+| Brave Search | Same as Google: auto-detects movie/TV searches and injects the info card |
 | IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
 | Trakt (`trakt.tv`, `app.trakt.tv`, season/episode URLs) | Adds a play control / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) — improved v3 layout support |
 | SIMKL & TMDb title pages (`simkl.com`, `themoviedb.org`) | Matched for upcoming integration; in-app links are being expanded |
