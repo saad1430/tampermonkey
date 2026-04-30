@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Daily Visit Manager
 // @namespace    http://github.com/saad1430/tampermonkey
-// @version      1.0
+// @version      1.1
 // @description  Automatically opens configured sites once per day on first interaction. Manage sites via the floating UI panel.
 // @updateURL    https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
 // @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
@@ -40,7 +40,8 @@
     const KEY_FAB_HIDDEN  = 'dvm_fab_hidden';
     const KEY_HINT_DATE   = 'dvm_hint_date';
     const KEY_PAUSE_UNTIL = 'dvm_pause_until';
-    const PAUSE_DURATION  = 60 * 60 * 1000; // 1 hour ms
+
+    let editingSiteId = null;
 
     // ─── Storage Helpers ──────────────────────────────────────────────────────
 
@@ -49,19 +50,32 @@
     }
     function saveSites(s) { GM_setValue(KEY_SITES, JSON.stringify(s)); }
 
-    function getTodayString() {
+    function getTodayStringLocal() {
         const n = new Date();
         return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
     }
-    function hasVisitedToday(id)  { return GM_getValue(`dvm_visited_${id}`, null) === getTodayString(); }
-    function markVisitedToday(id) { GM_setValue(`dvm_visited_${id}`, getTodayString()); }
+
+    // If site.resetAtUtcMinutes is set (0..1439), "day" starts at that UTC time.
+    // Example: 00:00 UTC => resetAtUtcMinutes = 0
+    function getTodayStringUtcReset(resetAtUtcMinutes) {
+        const t = Date.now() - (resetAtUtcMinutes * 60 * 1000);
+        return new Date(t).toISOString().slice(0, 10);
+    }
+
+    function getSiteTodayString(site) {
+        const m = site?.resetAtUtcMinutes;
+        return Number.isFinite(m) ? getTodayStringUtcReset(m) : getTodayStringLocal();
+    }
+
+    function hasVisitedToday(site)  { return GM_getValue(`dvm_visited_${site.id}`, null) === getSiteTodayString(site); }
+    function markVisitedToday(site) { GM_setValue(`dvm_visited_${site.id}`, getSiteTodayString(site)); }
     function generateId()         { return Math.random().toString(36).slice(2, 10); }
 
     // ─── Pause State ──────────────────────────────────────────────────────────
 
     function isPaused()   { return Date.now() < GM_getValue(KEY_PAUSE_UNTIL, 0); }
     function pauseUntil() { return GM_getValue(KEY_PAUSE_UNTIL, 0); }
-    function setPaused()  { GM_setValue(KEY_PAUSE_UNTIL, Date.now() + PAUSE_DURATION); }
+    function setPaused(hours)  { GM_setValue(KEY_PAUSE_UNTIL, Date.now() + (hours * 60 * 60 * 1000)); }
     function clearPause() { GM_setValue(KEY_PAUSE_UNTIL, 0); }
 
     // ─── FAB Hidden State ─────────────────────────────────────────────────────
@@ -89,12 +103,12 @@
         const sites = getSites().filter(s => s.active);
 
         for (const site of sites) {
-            if (currentPageMatchesSite(site) && !hasVisitedToday(site.id)) {
-                markVisitedToday(site.id);
+            if (currentPageMatchesSite(site) && !hasVisitedToday(site)) {
+                markVisitedToday(site);
             }
         }
 
-        const pending = sites.filter(s => !hasVisitedToday(s.id));
+        const pending = sites.filter(s => !hasVisitedToday(s));
         if (pending.length === 0) return;
 
         let fired = false;
@@ -104,8 +118,8 @@
             document.removeEventListener('click',   handleFirstInteraction, true);
             document.removeEventListener('keydown', handleFirstInteraction, true);
             for (const site of pending) {
-                if (!hasVisitedToday(site.id)) {
-                    markVisitedToday(site.id);
+                if (!hasVisitedToday(site)) {
+                    markVisitedToday(site);
                     window.open(site.url, '_blank');
                 }
             }
@@ -152,8 +166,8 @@
 
     function maybeShowHintToast() {
         if (!isFabHidden()) return;
-        if (GM_getValue(KEY_HINT_DATE, null) === getTodayString()) return;
-        GM_setValue(KEY_HINT_DATE, getTodayString());
+        if (GM_getValue(KEY_HINT_DATE, null) === getTodayStringLocal()) return;
+        GM_setValue(KEY_HINT_DATE, getTodayStringLocal());
         setTimeout(() => showToast(
             `⌨️ Daily Visit Manager is running\n<span style="color:${C.muted};font-size:11px">Ctrl+Alt+A — open &nbsp;·&nbsp; Ctrl+Alt+S — pause</span>`,
             6000, 'info'
@@ -211,7 +225,27 @@
                 font-size:11px; font-weight:500; letter-spacing:0.09em;
                 text-transform:uppercase; color:${C.muted}; white-space:nowrap;
             }
-            .dvm-header-actions { display:flex; gap:5px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+            .dvm-ver {
+                font-size:10px;
+                letter-spacing:0.06em;
+                color:${C.muted};
+                opacity:0.9;
+                margin-left:6px;
+            }
+            .dvm-header-actions { display:flex; gap:6px; align-items:center; justify-content:flex-end; }
+
+            .dvm-btn-close {
+                background:transparent;
+                color:${C.danger};
+                border:1px solid transparent;
+                padding:4px 8px;
+                font-size:14px;
+                border-radius:8px;
+                cursor:pointer;
+                line-height:1;
+                font-family:${FONT};
+            }
+            .dvm-btn-close:hover { color:${C.dangerHover}; border-color:rgba(224,92,106,0.35); }
 
             #dvm-status-bar {
                 padding:7px 16px; font-size:11px;
@@ -223,6 +257,7 @@
             .dvm-dot.paused { background:${C.warn}; }
             .dvm-status-text { color:${C.muted}; flex:1; }
             .dvm-status-text span { color:${C.warn}; }
+            .dvm-status-actions { display:flex; gap:8px; align-items:center; }
 
             .dvm-btn {
                 font-family:${FONT}; font-size:11px; border:none; border-radius:6px;
@@ -238,6 +273,9 @@
             .dvm-btn-warn:hover { border-color:${C.warn}; }
             .dvm-btn-danger  { background:transparent; color:${C.danger}; border:1px solid transparent; padding:4px 7px; }
             .dvm-btn-danger:hover { color:${C.dangerHover}; }
+            .dvm-btn-icon { background:transparent; color:${C.muted}; border:1px solid transparent; padding:4px 7px; }
+            .dvm-btn-icon:hover { color:${C.text}; }
+            .dvm-btn-icon:disabled { opacity:0.5; cursor:not-allowed; }
 
             .dvm-list { overflow-y:auto; flex:1; padding:6px 0; }
             .dvm-list::-webkit-scrollbar { width:4px; }
@@ -290,6 +328,7 @@
                 padding:7px 10px; outline:none; transition:border-color 0.15s;
             }
             .dvm-input:focus { border-color:${C.accent}; }
+            .dvm-input:disabled { opacity:0.65; cursor:not-allowed; }
 
             .dvm-radio-group { display:flex; gap:7px; }
             .dvm-radio-option {
@@ -309,13 +348,53 @@
 
             .dvm-footer {
                 padding:8px 16px; border-top:1px solid ${C.border};
-                display:flex; gap:14px; flex-shrink:0; background:${C.surface};
+                display:flex; gap:12px; flex-shrink:0; background:${C.surface};
+                flex-wrap:wrap; align-items:center;
             }
             .dvm-kbd-hint { font-size:10px; color:${C.muted}; display:flex; align-items:center; gap:4px; }
             .dvm-kbd {
                 background:${C.tag}; border:1px solid ${C.border};
                 border-radius:3px; padding:1px 5px; font-size:10px; color:${C.text};
             }
+            #dvm-hide-fab-btn {
+                margin-left:auto;
+                white-space:nowrap;
+                padding:5px 9px;
+                max-width:220px;
+                text-align:left;
+            }
+
+            #dvm-fab-menu {
+                position:fixed;
+                z-index:2147483647;
+                min-width:190px;
+                background:${C.surface};
+                border:1px solid ${C.border};
+                border-radius:12px;
+                box-shadow:0 20px 60px rgba(0,0,0,0.65);
+                padding:6px;
+                display:none;
+            }
+            #dvm-fab-menu.open { display:block; }
+            .dvm-menu-item {
+                width:100%;
+                text-align:left;
+                background:transparent;
+                border:1px solid transparent;
+                color:${C.text};
+                font-family:${FONT};
+                font-size:12px;
+                padding:8px 10px;
+                border-radius:10px;
+                cursor:pointer;
+                display:flex;
+                justify-content:space-between;
+                gap:10px;
+            }
+            .dvm-menu-item:hover { background:rgba(255,255,255,0.04); border-color:${C.border}; }
+            .dvm-menu-muted { color:${C.muted}; font-size:11px; }
+            .dvm-menu-danger { color:${C.danger}; }
+            .dvm-menu-danger:hover { background:rgba(224,92,106,0.08); border-color:rgba(224,92,106,0.25); }
         `;
         document.head.appendChild(style);
     }
@@ -358,8 +437,15 @@
             clearPause();
             showToast('▶️ Script resumed', 2500, 'success');
         } else {
-            setPaused();
-            showToast('⏸ Script paused for 1 hour', 2500, 'warn');
+            const input = prompt('Pause for how many hours?', '1');
+            if (input === null) return;
+            const hours = Number(input);
+            if (!Number.isFinite(hours) || hours <= 0 || hours > 72) {
+                showToast('Invalid hours. Enter a number between 0.1 and 72.', 3500, 'danger');
+                return;
+            }
+            setPaused(hours);
+            showToast(`⏸ Script paused for ${hours} hour${hours === 1 ? '' : 's'}`, 2500, 'warn');
         }
         updateFabIcon(fab);
         if (panel.classList.contains('open')) syncStatusBar(panel);
@@ -382,7 +468,7 @@
             btn.className = 'dvm-btn dvm-btn-primary';
         } else {
             text.textContent = 'Running';
-            btn.textContent = '⏸ Pause 1h';
+            btn.textContent = '⏸ Pause';
             btn.className = 'dvm-btn dvm-btn-warn';
         }
     }
@@ -409,10 +495,10 @@
         const btn = panel.querySelector('#dvm-hide-fab-btn');
         if (!btn) return;
         if (isFabHidden()) {
-            btn.textContent = '👁 Show FAB';
+            btn.textContent = '👁 Show floating button';
             btn.onclick = () => { showFab(fab); syncHideFabBtn(fab, panel); };
         } else {
-            btn.textContent = '🙈 Hide FAB';
+            btn.textContent = '🙈 Hide floating button';
             btn.onclick = () => hideFab(fab, panel);
         }
     }
@@ -511,13 +597,15 @@
                     <div class="dvm-site-meta">
                         <span class="dvm-site-url">${escHtml(site.url)}</span>
                         <span class="dvm-tag">${site.matchType === 'domain' ? 'domain' : 'full url'}</span>
-                        ${hasVisitedToday(site.id) ? `<span class="dvm-tag dvm-tag-done">✓ visited</span>` : ''}
+                        <span class="dvm-tag">${formatResetTag(site)}</span>
+                        ${hasVisitedToday(site) ? `<span class="dvm-tag dvm-tag-done">✓ visited</span>` : ''}
                     </div>
                 </div>
                 <label class="dvm-toggle">
                     <input type="checkbox" class="dvm-toggle-active" data-id="${site.id}" ${site.active ? 'checked' : ''} />
                     <span class="dvm-toggle-slider"></span>
                 </label>
+                <button class="dvm-btn dvm-btn-icon dvm-edit-btn" title="Edit URL / Reset time" data-id="${site.id}">✎</button>
                 <button class="dvm-btn dvm-btn-danger dvm-delete-btn" data-id="${site.id}">✕</button>
             </div>
         `).join('');
@@ -537,25 +625,98 @@
                 renderList();
             });
         });
+
+        list.querySelectorAll('.dvm-edit-btn').forEach(el => {
+            el.addEventListener('click', () => openEditForm(el.dataset.id));
+        });
     }
 
     // ─── Form ─────────────────────────────────────────────────────────────────
 
     function openForm() {
+        editingSiteId = null;
         const form = document.getElementById('dvm-form');
         form.classList.add('open');
-        document.getElementById('dvm-f-name').value = '';
-        document.getElementById('dvm-f-url').value  = '';
+        document.querySelector('#dvm-form .dvm-form-title').textContent = 'New Site';
+        document.getElementById('dvm-save-btn').textContent = 'Save';
+
+        const defaultName = (document.title || location.hostname || '').trim().slice(0, 40);
+        const nameEl = document.getElementById('dvm-f-name');
+        const urlEl = document.getElementById('dvm-f-url');
+        const resetEl = document.getElementById('dvm-f-reset-utc');
+        const activeEl = document.getElementById('dvm-f-active');
+        const domainEl = document.getElementById('dvm-r-domain');
+        const fullEl = document.getElementById('dvm-r-full');
+
+        nameEl.disabled = false;
+        domainEl.disabled = false;
+        fullEl.disabled = false;
+        activeEl.disabled = false;
+
+        nameEl.value = defaultName;
+        urlEl.value  = location.href || '';
         document.getElementById('dvm-r-domain').checked = true;
         document.getElementById('dvm-r-domain-label').classList.add('selected');
         document.getElementById('dvm-r-full-label').classList.remove('selected');
         document.getElementById('dvm-f-active').checked = true;
+        resetEl.value = '';
         hideError();
         document.getElementById('dvm-f-name').focus();
     }
 
+    function openEditForm(id) {
+        const sites = getSites();
+        const site = sites.find(s => s.id === id);
+        if (!site) return;
+
+        editingSiteId = id;
+        const form = document.getElementById('dvm-form');
+        form.classList.add('open');
+        document.querySelector('#dvm-form .dvm-form-title').textContent = 'Edit Site';
+        document.getElementById('dvm-save-btn').textContent = 'Update';
+
+        const nameEl = document.getElementById('dvm-f-name');
+        const urlEl = document.getElementById('dvm-f-url');
+        const resetEl = document.getElementById('dvm-f-reset-utc');
+        const activeEl = document.getElementById('dvm-f-active');
+        const domainEl = document.getElementById('dvm-r-domain');
+        const fullEl = document.getElementById('dvm-r-full');
+
+        // Only allow URL + reset time edits
+        nameEl.value = site.name || '';
+        nameEl.disabled = true;
+
+        urlEl.value = site.url || '';
+        urlEl.disabled = false;
+
+        const m = site?.resetAtUtcMinutes;
+        if (Number.isFinite(m)) {
+            const hh = String(Math.floor(m / 60)).padStart(2, '0');
+            const mm = String(m % 60).padStart(2, '0');
+            resetEl.value = `${hh}:${mm}`;
+        } else {
+            resetEl.value = '';
+        }
+        resetEl.disabled = false;
+
+        domainEl.checked = site.matchType === 'domain';
+        fullEl.checked = site.matchType !== 'domain';
+        domainEl.disabled = true;
+        fullEl.disabled = true;
+        document.getElementById('dvm-r-domain-label').classList.toggle('selected', domainEl.checked);
+        document.getElementById('dvm-r-full-label').classList.toggle('selected', fullEl.checked);
+
+        activeEl.checked = !!site.active;
+        activeEl.disabled = true;
+
+        hideError();
+        urlEl.focus();
+        urlEl.select();
+    }
+
     function closeForm() {
         document.getElementById('dvm-form')?.classList.remove('open');
+        editingSiteId = null;
         hideError();
     }
 
@@ -574,19 +735,37 @@
         const url       = document.getElementById('dvm-f-url').value.trim();
         const matchType = document.querySelector('input[name="dvm-match"]:checked').value;
         const active    = document.getElementById('dvm-f-active').checked;
+        const resetUtc  = document.getElementById('dvm-f-reset-utc').value.trim();
 
-        if (!name) return showError('Name is required.');
         if (!url)  return showError('URL is required.');
 
         let parsedUrl;
         try { parsedUrl = new URL(url); } catch { return showError('Invalid URL — include https://'); }
 
         const sites = getSites();
-        if (sites.find(s => s.name.toLowerCase() === name.toLowerCase())) return showError('Name already exists.');
-        if (sites.find(s => s.url === parsedUrl.href))                    return showError('URL already registered.');
+        if (!editingSiteId) {
+            if (!name) return showError('Name is required.');
+            if (sites.find(s => s.name.toLowerCase() === name.toLowerCase())) return showError('Name already exists.');
+        }
+        if (sites.find(s => s.url === parsedUrl.href && s.id !== editingSiteId)) return showError('URL already registered.');
 
-        sites.push({ id: generateId(), name, url: parsedUrl.href, matchType, active });
-        saveSites(sites);
+        let resetAtUtcMinutes = null;
+        if (resetUtc) {
+            const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(resetUtc);
+            if (!m) return showError('Reset time must be HH:MM (UTC), e.g. 00:00');
+            resetAtUtcMinutes = (parseInt(m[1], 10) * 60) + parseInt(m[2], 10);
+        }
+
+        if (editingSiteId) {
+            const site = sites.find(s => s.id === editingSiteId);
+            if (!site) return showError('Site not found.');
+            site.url = parsedUrl.href;
+            site.resetAtUtcMinutes = resetAtUtcMinutes;
+            saveSites(sites);
+        } else {
+            sites.push({ id: generateId(), name, url: parsedUrl.href, matchType, active, resetAtUtcMinutes });
+            saveSites(sites);
+        }
         closeForm();
         renderList();
     }
@@ -595,10 +774,21 @@
         return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    function formatResetTag(site) {
+        const m = site?.resetAtUtcMinutes;
+        if (!Number.isFinite(m)) return 'local reset';
+        const hh = String(Math.floor(m / 60)).padStart(2, '0');
+        const mm = String(m % 60).padStart(2, '0');
+        return `reset ${hh}:${mm}Z`;
+    }
+
     // ─── Build UI ─────────────────────────────────────────────────────────────
 
     function buildUI() {
         injectStyles();
+
+        const scriptName = (typeof GM_info !== 'undefined' && GM_info?.script?.name) ? GM_info.script.name : 'Daily Visit Manager';
+        const scriptVersion = (typeof GM_info !== 'undefined' && GM_info?.script?.version) ? GM_info.script.version : '';
 
         // FAB
         const fab = document.createElement('button');
@@ -619,17 +809,18 @@
         panel.id = 'dvm-panel';
         panel.innerHTML = `
             <div class="dvm-header">
-                <span class="dvm-title">Daily Visit Manager</span>
+                <span class="dvm-title">${escHtml(scriptName)}${scriptVersion ? ` <span class="dvm-ver">(v${escHtml(String(scriptVersion))}</span>)` : ''}</span>
                 <div class="dvm-header-actions">
-                    <button class="dvm-btn dvm-btn-primary" id="dvm-add-btn">+ Add</button>
-                    <button class="dvm-btn dvm-btn-warn"    id="dvm-pause-btn">⏸ Pause 1h</button>
-                    <button class="dvm-btn dvm-btn-ghost"   id="dvm-hide-fab-btn">🙈 Hide FAB</button>
-                    <button class="dvm-btn dvm-btn-ghost"   id="dvm-close-btn">✕</button>
+                    <button class="dvm-btn-close" id="dvm-close-btn" title="Close">✕</button>
                 </div>
             </div>
             <div id="dvm-status-bar">
                 <div class="dvm-dot" id="dvm-dot"></div>
                 <div class="dvm-status-text" id="dvm-status-text">Running</div>
+                <div class="dvm-status-actions">
+                    <button class="dvm-btn dvm-btn-warn"    id="dvm-pause-btn">⏸ Pause</button>
+                    <button class="dvm-btn dvm-btn-primary" id="dvm-add-btn">+ Add</button>
+                </div>
             </div>
             <div class="dvm-list" id="dvm-list"></div>
             <div class="dvm-form" id="dvm-form">
@@ -641,6 +832,10 @@
                 <div class="dvm-field">
                     <span class="dvm-label">URL</span>
                     <input class="dvm-input" id="dvm-f-url" placeholder="https://simkl.com/" />
+                </div>
+                <div class="dvm-field">
+                    <span class="dvm-label">Reset time (UTC, optional)</span>
+                    <input class="dvm-input" id="dvm-f-reset-utc" placeholder="00:00 (leave empty = local midnight)" />
                 </div>
                 <div class="dvm-field">
                     <span class="dvm-label">Match Type</span>
@@ -670,15 +865,102 @@
             </div>
             <div class="dvm-footer">
                 <div class="dvm-kbd-hint"><span class="dvm-kbd">Ctrl+Alt+A</span> open</div>
-                <div class="dvm-kbd-hint"><span class="dvm-kbd">Ctrl+Alt+S</span> pause 1h</div>
+                <div class="dvm-kbd-hint"><span class="dvm-kbd">Ctrl+Alt+S</span> pause</div>
+                <div style="flex:1"></div>
+                <button class="dvm-btn dvm-btn-ghost" id="dvm-hide-fab-btn">🙈 Hide floating button</button>
             </div>
         `;
 
         document.body.appendChild(fab);
         document.body.appendChild(panel);
 
+        // FAB right-click menu
+        const fabMenu = document.createElement('div');
+        fabMenu.id = 'dvm-fab-menu';
+        fabMenu.innerHTML = `
+            <button class="dvm-menu-item" id="dvm-m-open"><span>Open configuration</span><span class="dvm-menu-muted">Ctrl+Alt+A</span></button>
+            <button class="dvm-menu-item" id="dvm-m-pause"><span>Pause / Resume</span><span class="dvm-menu-muted">Ctrl+Alt+S</span></button>
+            <button class="dvm-menu-item" id="dvm-m-add-current"><span>Add current site</span><span class="dvm-menu-muted">quick</span></button>
+            <button class="dvm-menu-item" id="dvm-m-add-new"><span>Add new site</span><span class="dvm-menu-muted">form</span></button>
+            <button class="dvm-menu-item dvm-menu-danger" id="dvm-m-hide"><span>Hide floating button</span><span class="dvm-menu-muted">✕</span></button>
+        `;
+        document.body.appendChild(fabMenu);
+
         makeDraggable(fab, panel);
         fab.addEventListener('click', () => togglePanel(fab, panel));
+
+        function closeFabMenu() { fabMenu.classList.remove('open'); }
+        function openFabMenu(x, y) {
+            // Close form/panel interactions are independent; menu just floats.
+            fabMenu.classList.add('open');
+            // Position inside viewport
+            const margin = 8;
+            const mw = fabMenu.offsetWidth || 200;
+            const mh = fabMenu.offsetHeight || 200;
+            const left = Math.max(margin, Math.min(x, window.innerWidth - mw - margin));
+            const top = Math.max(margin, Math.min(y, window.innerHeight - mh - margin));
+            fabMenu.style.left = left + 'px';
+            fabMenu.style.top = top + 'px';
+        }
+
+        function addCurrentSiteQuick() {
+            const name = (document.title || location.hostname || 'New site').trim().slice(0, 40);
+            const url = (location.href || '').trim();
+            if (!url) return showToast('No URL detected for this page.', 2500, 'danger');
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch { return showToast('Current page URL is invalid.', 2500, 'danger'); }
+
+            const sites = getSites();
+            if (sites.find(s => s.url === parsedUrl.href)) {
+                showToast('This URL is already registered.', 2500, 'warn');
+                return;
+            }
+            sites.push({ id: generateId(), name, url: parsedUrl.href, matchType: 'domain', active: true, resetAtUtcMinutes: null });
+            saveSites(sites);
+            renderList();
+            showToast('✓ Added current site', 2000, 'success');
+        }
+
+        fab.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            syncHideFabBtn(fab, panel);
+            syncStatusBar(panel);
+            openFabMenu(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!fabMenu.classList.contains('open')) return;
+            if (fabMenu.contains(e.target)) return;
+            closeFabMenu();
+        }, true);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFabMenu(); }, true);
+        window.addEventListener('resize', closeFabMenu, true);
+        window.addEventListener('scroll', closeFabMenu, true);
+
+        fabMenu.querySelector('#dvm-m-open').addEventListener('click', () => {
+            closeFabMenu();
+            if (isFabHidden()) showFab(fab);
+            openPanel(fab, panel);
+        });
+        fabMenu.querySelector('#dvm-m-pause').addEventListener('click', () => {
+            closeFabMenu();
+            togglePause(fab, panel);
+        });
+        fabMenu.querySelector('#dvm-m-add-current').addEventListener('click', () => {
+            closeFabMenu();
+            addCurrentSiteQuick();
+        });
+        fabMenu.querySelector('#dvm-m-add-new').addEventListener('click', () => {
+            closeFabMenu();
+            if (isFabHidden()) showFab(fab);
+            openPanel(fab, panel);
+            openForm();
+        });
+        fabMenu.querySelector('#dvm-m-hide').addEventListener('click', () => {
+            closeFabMenu();
+            hideFab(fab, panel);
+        });
 
         panel.querySelector('#dvm-close-btn').addEventListener('click',  () => closePanel(panel));
         panel.querySelector('#dvm-add-btn').addEventListener('click',     openForm);
@@ -742,6 +1024,11 @@
     maybeShowHintToast();
 
     GM_registerMenuCommand('Open Daily Visit Manager',  () => { if (isFabHidden()) showFab(fab); openPanel(fab, panel); });
-    GM_registerMenuCommand('Pause / Resume (1h)',       () => togglePause(fab, panel));
+    GM_registerMenuCommand('Pause / Resume',            () => togglePause(fab, panel));
+    GM_registerMenuCommand('Hide / Show floating button', () => {
+        if (isFabHidden()) showFab(fab);
+        else hideFab(fab, panel);
+        syncHideFabBtn(fab, panel);
+    });
 
 })();
