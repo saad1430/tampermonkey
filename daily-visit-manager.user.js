@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Daily Visit Manager
 // @namespace    http://github.com/saad1430/tampermonkey
-// @version      1.1
+// @version      1.1.1
 // @description  Automatically opens configured sites once per day on first interaction. Manage sites via the floating UI panel.
 // @updateURL    https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
 // @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
@@ -809,7 +809,7 @@
         panel.id = 'dvm-panel';
         panel.innerHTML = `
             <div class="dvm-header">
-                <span class="dvm-title">${escHtml(scriptName)}${scriptVersion ? ` <span class="dvm-ver">(v${escHtml(String(scriptVersion))}</span>)` : ''}</span>
+                <span class="dvm-title">${escHtml(scriptName)}${scriptVersion ? ` <span class="dvm-ver">(v${escHtml(String(scriptVersion))})</span>` : ''}</span>
                 <div class="dvm-header-actions">
                     <button class="dvm-btn-close" id="dvm-close-btn" title="Close">✕</button>
                 </div>
@@ -891,16 +891,12 @@
 
         function closeFabMenu() { fabMenu.classList.remove('open'); }
         function openFabMenu(x, y) {
-            // Close form/panel interactions are independent; menu just floats.
-            fabMenu.classList.add('open');
-            // Position inside viewport
+            fabMenu.classList.add('open'); // show first
             const margin = 8;
-            const mw = fabMenu.offsetWidth || 200;
-            const mh = fabMenu.offsetHeight || 200;
-            const left = Math.max(margin, Math.min(x, window.innerWidth - mw - margin));
-            const top = Math.max(margin, Math.min(y, window.innerHeight - mh - margin));
-            fabMenu.style.left = left + 'px';
-            fabMenu.style.top = top + 'px';
+            const mw = fabMenu.offsetWidth;  // now measurable
+            const mh = fabMenu.offsetHeight;
+            fabMenu.style.left = Math.max(margin, Math.min(x, window.innerWidth  - mw - margin)) + 'px';
+            fabMenu.style.top  = Math.max(margin, Math.min(y, window.innerHeight - mh - margin)) + 'px';
         }
 
         function addCurrentSiteQuick() {
