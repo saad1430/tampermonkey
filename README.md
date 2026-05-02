@@ -1,8 +1,8 @@
 # Movie/TV Shows Links Aggregator
 
-> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, IMDb, Trakt, or YTS pages.
+> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.7.11` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.7.12` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
@@ -31,10 +31,11 @@ For **TV shows** specifically, you also get episode controls — pick any season
 | Bing Search | Same as Google |
 | Brave Search | Same as Google |
 | DuckDuckGo | Same as Google |
-| IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
-| Trakt (V3 only) | Adds a play control / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) |
-| YTS movie pages (`yts.mx`, `yts.lt`, `yts.bz`, …) | Adds a **Play** button next to the download button |
-| SIMKL & TMDb title pages (`simkl.com`, `themoviedb.org`) | Matched for upcoming integration |
+| IMDb title pages | Adds a **▶ Watch Now** button next to the `watchlist` button (or use **Shift+P**) |
+| Trakt | Adds a **▶ Watch Now** button next to the `track` button (or use **Shift+P**) |
+| Simkl | Adds a **▶ Watch Now** button next to the `Add URL` button (or use **Shift+P**) |
+| YTS | Adds a **▶ Watch Now** button next to the `download` button (or use **Shift+P**) |
+| TMDb  | Support coming in next versions |
 
 ---
 
@@ -56,7 +57,9 @@ The script includes `@updateURL` and `@downloadURL` headers pointing to this rep
 
 Press **Shift+R** on any supported page to open the settings panel.
 
-You can also click the **⚙** floating button that appears in the bottom-right corner.
+You can also click the **⚙** floating button in the bottom-right corner when **Show settings button** is enabled in settings.
+
+If the FAB is hidden, use **Tampermonkey → Movie/TV Shows Links Aggregator → Show/Hide settings button** to show or hide it without opening the panel (the choice is saved like other settings). **Shift+R** still opens settings even when the button is off.
 
 Most settings apply **instantly** (the current info card re-renders on save), so you usually don’t need to refresh the page.
 
@@ -65,8 +68,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Setting | What it does |
 |---|---|
 | Auto-detect Movies/TV | Automatically shows the card when a media search is detected |
-| Google / Bing / Brave / DuckDuckGo / IMDb / Trakt / YTS support | Turn the script on or off per supported site |
-| Debug network requests | Logs TMDb requests to the browser console (for troubleshooting) |
+| Google / Bing / Brave / DuckDuckGo / IMDb / Trakt / Simkl / YTS support | Turn the script on or off per supported site |
 | Streaming links | The main list of watch links |
 | Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
 | Torrent sites | 1337x, EZTV, LimeTorrents, TPB, etc. |
@@ -83,6 +85,8 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Transparency/Glassy mode | Makes modals and panels use a frosted-glass look |
 | Theme | Switch between **TMDb**, **IMDb**, **Trakt**, **Trakt V3**, or **Custom** colours; **Reset custom colors to default** restores the built-in custom palette |
 | Notifications | Toast notifications for actions and status |
+| Show settings button | Shows or hides the **⚙** FAB; use the userscript menu command to toggle if you hide it |
+| Debug network requests | Logs TMDb requests to the browser console (for troubleshooting) |
 
 ---
 
@@ -91,7 +95,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Shortcut | Action |
 |---|---|
 | `Shift+R` | Open/close settings panel |
-| `Shift+P` | Toggle the streaming links overlay (on IMDb and Trakt pages) |
+| `Shift+P` | Toggle the streaming links overlay on **IMDb**, **Trakt**, **YTS** and **Simkl** title pages (where enabled) |
 
 ---
 
@@ -124,10 +128,10 @@ For a fuller statement on liability, third-party sites, and user responsibility 
 ## Troubleshooting
 
 **The card didn't appear automatically**
-→ Click the "Search Movie/TV Info" button at the top of results. You can also try adding more specific terms to your search (e.g. "movie" or "series").
+→ Click the `Search Movie/TV Info` button at the top of results. You can also try adding more specific terms to your search (e.g. "movie" or "series").
 
 **"No API key" prompt keeps appearing**
-→ Open settings with Shift+R, scroll to the API keys field, and paste your key there.
+→ Open settings with **Shift+R**, scroll to the API keys field, and paste your key there.
 
 **Trailer says "No trailer found"**
 → TMDb doesn't have a trailer listed for that title. Check the TMDb page directly.
@@ -176,4 +180,4 @@ Issues and small PRs are equally valued. Maintainers here are **you**: the peopl
 
 This project is licensed under the **[MIT License](LICENSE)**. The copyright notice in that file reads **© 2025–2026 Saad1430 Tampermonkey scripts**.
 
-**Disclaimer:** **[DISCLAIMER.md](DISCLAIMER.md)** describes how this software relates to third-party links and media, limits of liability, and that users are responsible for lawful use. It does not replace legal advice.
+**Disclaimer:** **[DISCLAIMER](DISCLAIMER.md)** describes how this software relates to third-party links and media, limits of liability, and that users are responsible for lawful use. It does not replace legal advice.

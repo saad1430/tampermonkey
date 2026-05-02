@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.11
+// @version      1.7.12
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -20,8 +20,8 @@
 // @match        https://trakt.tv/movies/*
 // @match        https://trakt.tv/shows/*
 // @match        https://app.trakt.tv/*
-// @match        https://simkl.com/tv/*
-// @match        https://simkl.com/movies/*
+// @match        https://simkl.com/*
+// @match        https://www.simkl.com/*
 // @match        https://themoviedb.org/movie/*
 // @match        https://themoviedb.org/tv/*
 // @match        https://yts.lt/movies/*
@@ -36,7 +36,9 @@
 // @grant        GM_setClipboard
 // @grant        GM_addStyle
 // @grant        GM_xmlhttpRequest
+// @grant        GM_registerMenuCommand
 // @connect      api.themoviedb.org
+// @connect      api.jikan.moe
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -151,6 +153,8 @@
     enableOnDuckDuckGoPage: true,
     enableOnImdbPage: true,
     enableOnTraktPage: true,
+    enableOnSimklPage: true,
+    enableOnTMDbPage: true,
     enableOnYTSPage: true,
     enableNotifications: true,
     debugNetworkRequests: false,
@@ -168,6 +172,7 @@
     showCertifications: true,
     enableTransparencyMode: true,
     openLinksInNewTab: true,
+    showSettingsButton: true,
 
     /* ---- Theme ---- */
     activeTheme: 'tmdb',            // 'tmdb' | 'imdb' | 'trakt' | 'traktv3' | 'custom'
@@ -196,10 +201,14 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added Trakt V3 theme</li>
+      <li>Added DuckDuckGo support</li>
+      <li>Added Simkl support</li>
       <li>Merged Trakt links for better compatibility</li>
+      <li>Added Trakt V3 theme</li>
+      <li>Added userscript menu to show/hide settings button</li>
       <li>Added Brave Search support</li>
       <li>Improved Automatic Media Detection</li>
+      <li>Minor UI/UX improvements</li>
     </ul>
   `;
 
@@ -592,13 +601,7 @@
     .tmdb-announcement-content { margin-top: 10px; font-size: 15px; }
     @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-    /* ---- Trakt v3 play button ---- */
-    #tmdb-trakt-summary-play {
-      background: transparent !important; background-color: transparent !important;
-      color: inherit !important; border: none !important;
-      box-shadow: none !important; appearance: none !important; -webkit-appearance: none !important;
-    }
-    #tmdb-trakt-summary-play path { fill: currentColor !important; }
+    /* Trakt summary play: no layout overrides — classes + data-* mirror native .trakt-action-button */
   `);
 
   /* ----------------------------------------------------
@@ -711,6 +714,41 @@
     }).catch((e) => { debugNetLog('fetch', url, undefined, undefined, e); throw e; });
   }
 
+  function jikanApiGetJson(url) {
+    const xhr = getGmXhr();
+    if (xhr) {
+      return new Promise((resolve, reject) => {
+        xhr({
+          method: 'GET', url, timeout: 45000,
+          onload(resp) {
+            if (resp.status < 200 || resp.status >= 300) { reject(new Error(`Jikan HTTP ${resp.status}`)); return; }
+            try {
+              const json = JSON.parse(resp.responseText || '{}');
+              debugNetLog('GM_xmlhttpRequest', url, resp.status, json);
+              resolve(json);
+            } catch (e) {
+              debugNetLog('GM_xmlhttpRequest', url, resp.status, resp.responseText, e);
+              reject(e);
+            }
+          },
+          onerror() { reject(new Error('Jikan network error')); },
+          ontimeout() { reject(new Error('Jikan request timeout')); },
+        });
+      });
+    }
+    return fetch(url).then(async (r) => {
+      if (!r.ok) {
+        let text = '';
+        try { text = await r.text(); } catch { /* ignore */ }
+        debugNetLog('fetch', url, r.status, text);
+        throw new Error(`Jikan HTTP ${r.status}`);
+      }
+      const json = await r.json();
+      debugNetLog('fetch', url, r.status, json);
+      return json;
+    }).catch((e) => { debugNetLog('fetch', url, undefined, undefined, e); throw e; });
+  }
+
   /* ----------------------------------------------------
    * Env & Query Helpers
    * -------------------------------------------------- */
@@ -721,7 +759,97 @@
   const isDuckDuckGo = hostname.includes('duckduckgo.com');
   const isImdb = hostname.includes('imdb.com');
   const isTrakt = hostname.includes('trakt.tv');
+  const isSimkl = hostname.includes('simkl.com');
   const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.bz') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
+
+  /** First calendar year in Simkl’s year/network row (e.g. 1995–1996 → 1995). */
+  function extractSimklPremiereYear() {
+    const row = document.querySelector('.SimklTVAboutYearCountry');
+    if (!row) return null;
+    const links = row.querySelectorAll('a');
+    for (let i = 0; i < links.length; i++) {
+      const t = (links[i].textContent || '').trim();
+      if (/^\d{4}$/.test(t)) return parseInt(t, 10);
+    }
+    const m = (row.textContent || '').match(/\b(19|20)\d{2}\b/);
+    return m ? parseInt(m[0], 10) : null;
+  }
+
+  /**
+   * English-friendly titles for TMDb search: Simkl keeps English in `itemprop="name"` or
+   * `itemprop="alternateName"` depending on display mode (English / romaji / native).
+   */
+  function extractSimklEnglishTitleCandidates() {
+    const h1 = document.querySelector('#bigtext-id0 h1[itemprop="name"]')?.textContent?.trim()
+      || document.querySelector('.SimklTVAboutTitleText h1[itemprop="name"]')?.textContent?.trim()
+      || '';
+    const h2 = document.querySelector('#bigtext-id1 h2[itemprop="alternateName"]')?.textContent?.trim()
+      || document.querySelector('.SimklTVAboutTitleText h2[itemprop="alternateName"]')?.textContent?.trim()
+      || '';
+    if (!h1 && !h2) return [];
+    const cjk = /[\u3040-\u30FF\u3400-\u9FFF]/;
+    const wc = (s) => (s ? s.split(/\s+/).filter(Boolean).length : 0);
+    const uniq = [];
+    const add = (s) => { const t = String(s).trim(); if (t && !uniq.some(u => u.toLowerCase() === t.toLowerCase())) uniq.push(t); };
+
+    if (cjk.test(h1)) {
+      if (h2) add(h2);
+      add(h1);
+      return uniq;
+    }
+    if (h1 && h2 && !cjk.test(h1) && !cjk.test(h2)) {
+      if (wc(h2) > wc(h1)) { add(h2); add(h1); }
+      else if (wc(h1) > wc(h2)) { add(h1); add(h2); }
+      else { add(h1); add(h2); }
+      return uniq;
+    }
+    add(h1);
+    add(h2);
+    return uniq;
+  }
+
+  async function resolveMalIdToTmdb(malId) {
+    const apiKey = getNextApiKey();
+
+    async function trySearchTv(titles, year) {
+      const tried = new Set();
+      for (let i = 0; i < titles.length; i++) {
+        const trimmed = String(titles[i]).trim();
+        if (!trimmed || tried.has(trimmed.toLowerCase())) continue;
+        tried.add(trimmed.toLowerCase());
+        let url = `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&query=${encodeURIComponent(trimmed)}`;
+        if (year != null) url += `&first_air_date_year=${year}`;
+        try {
+          const searchJson = await tmdbApiGetJson(url);
+          const first = searchJson?.results?.[0];
+          if (first?.id) return { tmdb: String(first.id), type: 'tv' };
+        } catch (e) { /* try next title */ }
+      }
+      return null;
+    }
+
+    if (isSimkl && isSimklTitleDetailPage()) {
+      const domYear = extractSimklPremiereYear();
+      const domTitles = extractSimklEnglishTitleCandidates();
+      if (domTitles.length) {
+        const hit = await trySearchTv(domTitles, domYear);
+        if (hit) return hit;
+      }
+    }
+
+    try {
+      const jikan = await jikanApiGetJson(`https://api.jikan.moe/v4/anime/${encodeURIComponent(malId)}`);
+      const d = jikan?.data;
+      if (!d) return null;
+      const year = d.year || d.aired?.prop?.from?.year || null;
+      const titles = [];
+      if (d.title_english) titles.push(d.title_english);
+      if (d.title) titles.push(d.title);
+      if (d.title_japanese && !titles.includes(d.title_japanese)) titles.push(d.title_japanese);
+      return await trySearchTv(titles, year);
+    } catch (e) { console.error('MAL→TMDb resolve failed:', e); }
+    return null;
+  }
 
   function currentSerpEngineEnabled() {
     if (isGoogle) return SETTINGS.enableOnGooglePage;
@@ -860,6 +988,51 @@
     setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.remove(); processQueue(); }, 220); }, duration);
   }
 
+  const GM_KEY_FAB_HIDDEN_HINT = 'tmdb_fab_hidden_hint_shown';
+
+  function applySettingsFab(opts = {}) {
+    const suppressHiddenHint = !!opts.suppressHiddenHint;
+    const existing = document.getElementById('tmdb-fab-settings');
+    if (SETTINGS.showSettingsButton) {
+      if (existing) {
+        existing.style.display = '';
+        return;
+      }
+      const fab = document.createElement('button');
+      fab.id = 'tmdb-fab-settings';
+      fab.title = 'Movie/TV Shows Links Aggregator Script Settings (Shift+R)';
+      fab.innerHTML = '⚙';
+      fab.addEventListener('click', openSettingsPanel);
+      document.body.appendChild(fab);
+    } else {
+      existing?.remove();
+      if (!suppressHiddenHint && !GM_getValue(GM_KEY_FAB_HIDDEN_HINT, false)) {
+        showNotification('Settings button is hidden. Open settings with Shift+R or use the userscript menu to toggle it back on.');
+        GM_setValue(GM_KEY_FAB_HIDDEN_HINT, true);
+      }
+    }
+  }
+
+  function registerFabMenuCommands() {
+    const reg =
+      typeof GM_registerMenuCommand === 'function'
+        ? (caption, fn) => { GM_registerMenuCommand(caption, fn); }
+        : typeof GM !== 'undefined' && typeof GM.registerMenuCommand === 'function'
+          ? (caption, fn) => { GM.registerMenuCommand(caption, fn); }
+          : null;
+    if (!reg) return;
+    reg('Show/hide settings button', () => {
+      const next = !SETTINGS.showSettingsButton;
+      SETTINGS = { ...SETTINGS, showSettingsButton: next };
+      saveSettings(SETTINGS);
+      applySettingsFab({ suppressHiddenHint: true });
+      showNotification(
+        next ? 'Settings button shown.' : 'Settings button hidden. Shift+R still opens settings.',
+        next ? 3000 : 4000
+      );
+    });
+  }
+
   /* ----------------------------------------------------
    * Settings Panel (Shift+R)
    * -------------------------------------------------- */
@@ -917,6 +1090,7 @@
           ${checkbox('enableOnDuckDuckGoPage', 'DuckDuckGo support', SETTINGS.enableOnDuckDuckGoPage)}
           ${checkbox('enableOnImdbPage', 'IMDB support', SETTINGS.enableOnImdbPage)}
           ${checkbox('enableOnTraktPage', 'Trakt support', SETTINGS.enableOnTraktPage)}
+          ${checkbox('enableOnSimklPage', 'Simkl support', SETTINGS.enableOnSimklPage)}
           ${checkbox('enableOnYTSPage', 'YTS support', SETTINGS.enableOnYTSPage)}
           ${checkbox('enableNotifications', 'Notifications', SETTINGS.enableNotifications)}
           ${checkbox('enableStreamingLinks', 'Streaming links', SETTINGS.enableStreamingLinks)}
@@ -933,6 +1107,7 @@
           ${checkbox('enableChangeResultButton', 'Change result button', SETTINGS.enableChangeResultButton)}
           ${checkbox('showCertifications', 'Certification', SETTINGS.showCertifications)}
           ${checkbox('enableTransparencyMode', 'Transparency/Glassy mode', SETTINGS.enableTransparencyMode)}
+          ${checkbox('showSettingsButton', 'Show settings button (⚠️ Use with caution) [Shift+R still opens settings; userscript menu toggles this button]', SETTINGS.showSettingsButton)}
           ${checkbox('debugNetworkRequests', 'Debug network requests (console logs)', SETTINGS.debugNetworkRequests)}
 
           ${formatSpecialThanksHtml(true)}
@@ -1033,6 +1208,7 @@
       SETTINGS = next;
       saveSettings(SETTINGS);
       applyTheme(SETTINGS.activeTheme);
+      applySettingsFab({ suppressHiddenHint: true });
       rerenderInfoCardIfPresent();
       showNotification('Settings saved & applied.', 4500);
       closeSettingsPanel();
@@ -1292,7 +1468,7 @@
   }
 
   /** Inline accent colour helper — used for links inside the info card HTML string */
-  function accentStyle() { return 'style="color:rgb(var(--tm-accent));font-weight:bold;"'; }
+  function accentStyle() { return 'style="color:rgb(var(--tm-accent));font-weight:bold;text-decoration:none;"'; }
   function accentStyleMuted() { return 'style="color:rgb(var(--tm-accent));font-weight:600;opacity:.88;font-size:13px;margin-left:4px;"'; }
   function imdbYellowStyle() { return 'style="color:rgb(245 197 24);font-weight:bold;"'; }
   function imdbBgStyle() { return 'style="color:black;background-color:rgb(245 197 24);"'; }
@@ -1611,6 +1787,12 @@
   }
 
   const trailerCache = new Map();
+  /** `${media_type}:${id}` → imdb id or null (avoids repeat external_ids calls). */
+  const tmdbExternalIdsCache = new Map();
+  /** `${type}:${id}` → certification string or '' */
+  const tmdbCertificationCache = new Map();
+  /** `imdb_id` → YTS list_movies JSON (or null if cached miss). */
+  const ytsMovieListCache = new Map();
 
   function showTrailerModal(youtubeKey) {
     if (!youtubeKey) return;
@@ -1648,18 +1830,32 @@
       let imdbId = null;
       if (isImdb) { imdbId = location.pathname.match(/title\/(tt\d+)/)?.[1]; }
       let imdb_id = null;
-      if (imdbId) { imdb_id = imdbId; } else {
-        const extJson = await tmdbApiGetJson(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
-        imdb_id = extJson.imdb_id;
+      if (imdbId) {
+        imdb_id = imdbId;
+      } else if (result.external_imdb) {
+        imdb_id = result.external_imdb;
+      } else {
+        const extKey = `${result.media_type}:${result.id}`;
+        if (tmdbExternalIdsCache.has(extKey)) {
+          imdb_id = tmdbExternalIdsCache.get(extKey);
+        } else {
+          const extJson = await tmdbApiGetJson(`${tmdbURL}${result.media_type}/${result.id}/external_ids?api_key=${apiKey}`);
+          imdb_id = extJson.imdb_id || null;
+          tmdbExternalIdsCache.set(extKey, imdb_id);
+        }
       }
 
       if (result.media_type === 'movie') {
         if (SETTINGS.enableYtsTorrents) {
           try {
             const ytsUrl = `${ytsAPI}${imdb_id}`;
-            const magnet = await fetch(ytsUrl);
-            const magnetData = await magnet.json();
-            debugNetLog('fetch', ytsUrl, magnet.status, magnetData);
+            let magnetData = imdb_id ? ytsMovieListCache.get(imdb_id) : null;
+            if (!magnetData) {
+              const magnet = await fetch(ytsUrl);
+              magnetData = await magnet.json();
+              debugNetLog('fetch', ytsUrl, magnet.status, magnetData);
+              if (imdb_id) ytsMovieListCache.set(imdb_id, magnetData);
+            }
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
               renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language);
             } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
@@ -1729,6 +1925,18 @@
   }
 
   async function addCertificationAsync(id, type) {
+    const certKey = `${type}:${id}`;
+    if (tmdbCertificationCache.has(certKey)) {
+      const cached = tmdbCertificationCache.get(certKey);
+      if (cached) {
+        const titleElem = document.querySelector('.tmdb-title');
+        if (titleElem && !titleElem.dataset.tmCertApplied) {
+          titleElem.dataset.tmCertApplied = '1';
+          titleElem.innerHTML += ` <span style="color:gray;font-size:14px;">[${cached}]</span>`;
+        }
+      }
+      return;
+    }
     const apiKey = getNextApiKey();
     let cert = '';
     try {
@@ -1755,11 +1963,15 @@
         cert = us?.rating || '';
         if (!cert) { const tr = json.results?.find(r => r.iso_3166_1 === 'TR'); cert = tr?.rating || ''; }
       }
+      tmdbCertificationCache.set(certKey, cert || '');
       if (cert) {
         const titleElem = document.querySelector('.tmdb-title');
-        if (titleElem) titleElem.innerHTML += ` <span style="color:gray;font-size:14px;">[${cert}]</span>`;
+        if (titleElem && !titleElem.dataset.tmCertApplied) {
+          titleElem.dataset.tmCertApplied = '1';
+          titleElem.innerHTML += ` <span style="color:gray;font-size:14px;">[${cert}]</span>`;
+        }
       }
-    } catch (err) { showNotification('Failed to fetch certification'); }
+    } catch (err) { showNotification('Failed to fetch certification'); tmdbCertificationCache.set(certKey, ''); }
   }
 
   function hideButton() {
@@ -1817,7 +2029,7 @@
 
       const bttn = document.createElement('button');
       bttn.id = 'tmdb-bttn-overlay';
-      bttn.textContent = '▶ Play';
+      bttn.textContent = '▶ Watch Now 😉';
       bttn.style.cssText = `margin-top:10px;cursor:pointer;padding:8px 12px;background:#f5c518;color:#000;border:none;border-radius:24px;font-weight:bold;font-size:18px;transition:all 0.2s ease;width:100%;max-width:100%;height:3rem;text-align:left;`;
       bttn.onmouseenter = () => bttn.style.background = '#e2b616';
       bttn.onmouseleave = () => bttn.style.background = '#f5c518';
@@ -1845,14 +2057,14 @@
       const apiKey = getNextApiKey();
       const json = await tmdbApiGetJson(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
       const data = json.movie_results?.[0] || json.tv_results?.[0];
-      if (!data) { showNotification('TMDb match not found for this IMDb ID.'); if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; } return; }
+      if (!data) { showNotification('TMDb match not found for this IMDb ID.'); if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Watch Now 😉'; } return; }
       imdbCache.set(imdbId, data);
       renderOverlayFromCache(data);
     } catch (err) {
       console.error('IMDb overlay error:', err);
       showNotification('Failed to fetch TMDb info.');
     } finally {
-      if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Play'; }
+      if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Watch Now 😉'; }
     }
   }
 
@@ -1893,7 +2105,6 @@
   let lastTraktBindKey = '';
   let traktSpaHooksInstalled = false;
   let traktGlobalKeydownInstalled = false;
-  let traktAppHintShown = false;
 
   function traktBindKey() {
     return `${location.pathname}${location.search}`;
@@ -2063,17 +2274,53 @@
     return `<svg width="16" height="16" viewBox="10.0013 5.625 7.4999 8.75" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${inner}</svg>`;
   }
 
+  function traktSummaryActionReferenceButton(bar) {
+    if (!bar) return null;
+    return (
+      bar.querySelector('.trakt-media-actions-popup-button button.trakt-action-button') ||
+      bar.querySelector('button.trakt-action-button[data-style="ghost"]') ||
+      bar.querySelector('trakt-track-action button.trakt-action-button')
+    );
+  }
+
+  function mirrorTraktActionButtonEl(btn, refBtn) {
+    const DATA_ATTRS = ['data-color', 'data-variant', 'data-size', 'data-style'];
+    if (refBtn) {
+      btn.className = `${refBtn.className} tmdb-trakt-summary-play`.trim();
+      DATA_ATTRS.forEach((attr) => {
+        if (refBtn.hasAttribute(attr)) btn.setAttribute(attr, refBtn.getAttribute(attr));
+        else btn.removeAttribute(attr);
+      });
+      return;
+    }
+    btn.className = 'trakt-action-button trakt-button-link tmdb-trakt-summary-play';
+    btn.setAttribute('data-color', 'default');
+    btn.setAttribute('data-variant', 'primary');
+    btn.setAttribute('data-size', 'normal');
+    btn.setAttribute('data-style', 'ghost');
+  }
+
+  function syncTraktSummaryPlayButtonFromNative() {
+    const btn = document.getElementById('tmdb-trakt-summary-play');
+    const bar = document.querySelector('.trakt-summary-actions-bar');
+    if (!btn || !bar) return;
+    mirrorTraktActionButtonEl(btn, traktSummaryActionReferenceButton(bar));
+  }
+
   function injectTraktSummaryPlayButton(onToggle) {
-    if (document.getElementById('tmdb-trakt-summary-play')) return true;
+    const existing = document.getElementById('tmdb-trakt-summary-play');
     const bar = document.querySelector('.trakt-summary-actions-bar');
     const track = bar?.querySelector('trakt-track-action');
+    if (existing) {
+      if (bar && track) syncTraktSummaryPlayButtonFromNative();
+      return true;
+    }
     if (!bar || !track) return false;
+    const refBtn = traktSummaryActionReferenceButton(bar);
     const btn = document.createElement('button');
     btn.id = 'tmdb-trakt-summary-play';
     btn.type = 'button';
-    btn.className = 'trakt-action-button trakt-button-link tmdb-trakt-summary-play';
-    btn.setAttribute('data-color', 'default'); btn.setAttribute('data-variant', 'primary');
-    btn.setAttribute('data-size', 'normal'); btn.setAttribute('data-style', 'ghost');
+    mirrorTraktActionButtonEl(btn, refBtn);
     btn.setAttribute('aria-label', 'TMDb streaming links (toggle)');
     btn.innerHTML = traktStylePlaySvgHtml();
     track.insertAdjacentElement('afterend', btn);
@@ -2081,12 +2328,39 @@
     return true;
   }
 
-  function scheduleTraktSummaryPlayButton(onToggle) {
+  /**
+   * @param {(usedFallback: boolean) => void} [onInjectOutcome] — called once: `false` if `#tmdb-trakt-summary-play`
+   *   was placed in the action bar, `true` if the header fallback `#tmdb-trakt-play` was used instead.
+   */
+  function scheduleTraktSummaryPlayButton(onToggle, onInjectOutcome) {
     let n = 0; const max = 80;
+    let outcomeReported = false;
+    const report = (usedFallback) => {
+      if (outcomeReported) return;
+      outcomeReported = true;
+      if (typeof onInjectOutcome === 'function') onInjectOutcome(usedFallback);
+    };
+    const resyncPlayBtnTraktClasses = () => {
+      syncTraktSummaryPlayButtonFromNative();
+      setTimeout(syncTraktSummaryPlayButtonFromNative, 450);
+      setTimeout(syncTraktSummaryPlayButtonFromNative, 1800);
+    };
     const tick = () => {
-      if (document.getElementById('tmdb-trakt-summary-play')) return;
-      if (injectTraktSummaryPlayButton(onToggle)) return;
-      if (++n >= max) { injectTraktFallbackPlayButton(onToggle); return; }
+      if (document.getElementById('tmdb-trakt-summary-play')) {
+        resyncPlayBtnTraktClasses();
+        report(false);
+        return;
+      }
+      if (injectTraktSummaryPlayButton(onToggle)) {
+        resyncPlayBtnTraktClasses();
+        report(false);
+        return;
+      }
+      if (++n >= max) {
+        injectTraktFallbackPlayButton(onToggle);
+        report(true);
+        return;
+      }
       setTimeout(tick, 200);
     };
     tick();
@@ -2097,7 +2371,7 @@
     const hdr = document.querySelector('header') || document.querySelector('main') || document.body;
     const b = document.createElement('button');
     b.id = 'tmdb-trakt-play'; b.type = 'button';
-    b.textContent = '▶ Streaming links (TMDb)'; b.className = 'tmdb-btn primary';
+    b.textContent = '▶ Watch Now 😉'; b.className = 'tmdb-btn primary';
     b.style.cssText = 'margin:8px 12px;z-index:2147483000;position:relative;';
     hdr.insertAdjacentElement('afterbegin', b);
     b.addEventListener('click', (e) => { e.preventDefault(); onToggle(); });
@@ -2114,20 +2388,22 @@
       void triggerTraktOverlay(traktOverlayPayloadRef || payload);
     };
 
-    scheduleTraktSummaryPlayButton(toggleOverlay);
-
     const isAppTrakt = location.hostname.startsWith('app.');
-    const watchBtn = findTraktWatchTrigger();
-    if (!isAppTrakt && watchBtn) {
-      showNotification('Trakt "Watch" opens this script\'s overlay; Shift+P toggles it.', 3500);
-      watchBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopImmediatePropagation(); void triggerTraktOverlay(traktOverlayPayloadRef || payload); }, true);
-    } else if (isAppTrakt) {
-      if (!traktAppHintShown) {
-        traktAppHintShown = true;
-        showNotification('▶ next to the watched checkmark toggles TMDb streaming links. Shift+P too.', 4500);
+    const watchBtnAtBind = findTraktWatchTrigger();
+
+    scheduleTraktSummaryPlayButton(toggleOverlay, (usedFallback) => {
+      if (!usedFallback) return;
+      if (isAppTrakt) {
+        showNotification('Action bar did not load in time — use the top "▶ Watch Now" button or Shift+P for TMDb streaming links.', 4500);
+      } else if (findTraktWatchTrigger()) {
+        showNotification('Streaming toggle is in the header — Trakt "Watch" also opens this overlay; Shift+P toggles it.', 4000);
+      } else {
+        showNotification('Use the top "Streaming links" button or Shift+P — the summary action bar did not load in time.', 4500);
       }
-    } else if (!watchBtn) {
-      showNotification('Use the top "Streaming links" button or Shift+P when the action bar is slow to load.', 4500);
+    });
+
+    if (!isAppTrakt && watchBtnAtBind) {
+      watchBtnAtBind.addEventListener('click', (e) => { e.preventDefault(); e.stopImmediatePropagation(); void triggerTraktOverlay(traktOverlayPayloadRef || payload); }, true);
     }
   }
 
@@ -2190,7 +2466,7 @@
     scheduleRebind();
   }
 
-  async function triggerTraktOverlay({ imdb, tmdb, type, season = null, episode = null }) {
+  async function triggerTraktOverlay({ imdb, tmdb, type, season = null, episode = null, mal = null }) {
     if (document.querySelector('.tmdb-overlay')) return;
     const apiKey = getNextApiKey();
     const tmdbBase = 'https://api.themoviedb.org/3';
@@ -2212,7 +2488,16 @@
       } catch (e) { console.error('Trakt IMDb→TMDb find failed:', e); showNotification('Failed to look up title on TMDb from IMDb.'); return; }
     }
 
-    if (!resolvedTmdb || !resolvedType) { showNotification('Need an IMDb title link on the Trakt page (or TMDb in the page) to load data.'); return; }
+    if ((!resolvedTmdb || !resolvedType) && mal) {
+      const fromMal = await resolveMalIdToTmdb(mal);
+      if (fromMal) { resolvedTmdb = fromMal.tmdb; resolvedType = fromMal.type; }
+    }
+
+    if (!resolvedTmdb || !resolvedType) {
+      if (mal && !imdb) showNotification('Could not match this MyAnimeList entry on TMDb. Try again or use a page with IMDb/TMDb links.');
+      else showNotification('Need an IMDb or TMDb id on the page, or a MyAnimeList anime link, to load data.');
+      return;
+    }
 
     const cacheKey = `${resolvedType}:${resolvedTmdb}${seasonUse != null ? `:s${seasonUse}` : ''}${episodeUse != null ? `:e${episodeUse}` : ''}`;
     if (traktCache.has(cacheKey)) return renderTraktOverlay(traktCache.get(cacheKey), seasonUse, episodeUse);
@@ -2220,7 +2505,18 @@
     try {
       const data = await tmdbApiGetJson(`${tmdbBase}/${resolvedType}/${resolvedTmdb}?api_key=${apiKey}`);
       let imdb_id = imdb;
-      if (!imdb_id) { const extJson = await tmdbApiGetJson(`${tmdbBase}/${resolvedType}/${resolvedTmdb}/external_ids?api_key=${apiKey}`); imdb_id = extJson.imdb_id || null; }
+      const extCacheKey = `${resolvedType}:${resolvedTmdb}`;
+      if (!imdb_id) {
+        if (tmdbExternalIdsCache.has(extCacheKey)) {
+          imdb_id = tmdbExternalIdsCache.get(extCacheKey);
+        } else {
+          const extJson = await tmdbApiGetJson(`${tmdbBase}/${resolvedType}/${resolvedTmdb}/external_ids?api_key=${apiKey}`);
+          imdb_id = extJson.imdb_id || null;
+          tmdbExternalIdsCache.set(extCacheKey, imdb_id);
+        }
+      } else {
+        tmdbExternalIdsCache.set(extCacheKey, imdb_id);
+      }
       data.media_type = resolvedType; data.external_imdb = imdb_id;
       traktCache.set(cacheKey, data);
       renderTraktOverlay(data, seasonUse, episodeUse);
@@ -2234,11 +2530,346 @@
     overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    const fakeResult = { id: data.id, media_type: data.media_type, title: data.title || data.name, release_date: data.release_date, first_air_date: data.first_air_date };
+    const fakeResult = {
+      id: data.id,
+      media_type: data.media_type,
+      title: data.title || data.name,
+      release_date: data.release_date,
+      first_air_date: data.first_air_date,
+      external_imdb: data.external_imdb || null,
+    };
     await processSearchResult(fakeResult, season, episode);
     const card = document.querySelector('.tmdb-info-card');
     if (card) overlay.querySelector('#tmdb-overlay-inner').appendChild(card);
     else overlay.remove();
+  }
+
+  /* ----------------------------------------------------
+  * Simkl Page Handler
+  * -------------------------------------------------- */
+  let simklOverlayPayloadRef = null;
+  let lastSimklBindKey = '';
+  let simklGlobalKeydownInstalled = false;
+  let simklSpaHooksInstalled = false;
+  let simklLastFallbackHintKey = '';
+  let simklMo = null;
+  let simklRebindGen = 0;
+
+  /** Only movie / TV / anime **title** pages (`/movies/123/…`, `/tv/123/…`, `/anime/123/…`). */
+  function isSimklTitleDetailPage() {
+    return /^\/(anime|tv|movies)\/\d+/i.test(location.pathname);
+  }
+
+  function removeSimklInjections() {
+    document.getElementById('tmdb-simkl-play')?.remove();
+    document.querySelector('.tmdb-overlay')?.remove();
+  }
+
+  function parseSimklPathKind() {
+    const m = location.pathname.match(/^\/(anime|tv|movies)\/(\d+)/);
+    if (!m) return null;
+    return { segment: m[1], simklId: m[2], mediaType: m[1] === 'movies' ? 'movie' : 'tv' };
+  }
+
+  /** SPA / quick-switch: URL can lag behind DOM — bind identity includes visible title + external ids. */
+  function simklContentFingerprint() {
+    const path = parseSimklPathKind();
+    const slugId = path?.simklId || '';
+    const h1 = document.querySelector('#bigtext-id0 h1[itemprop="name"]')?.textContent?.trim()?.slice(0, 120) || '';
+    let imdb = '';
+    const ia = document.querySelector(
+      'table.SimklTVAboutRatingsBlockTable td.imdb-rating a[href*="imdb.com"], td.imdb-rating a[href*="imdb.com"], .imdb-rating a[href*="imdb.com"]'
+    );
+    if (ia) {
+      const h = (ia.getAttribute('href') || ia.href || '').trim();
+      const m = h.match(/(tt\d+)/i);
+      if (m) imdb = m[1];
+    }
+    let mal = '';
+    const ma = document.querySelector(
+      'table.SimklTVAboutRatingsBlockTable td.mal-rating a[href*="myanimelist"], td.mal-rating a[href*="myanimelist"], .mal-rating a[href*="myanimelist"]'
+    );
+    if (ma) {
+      const h = (ma.getAttribute('href') || ma.href || '').trim();
+      const mm = h.match(/myanimelist\.net\/anime\/(\d+)/i);
+      if (mm) mal = mm[1];
+    }
+    return `${slugId}|${h1}|${imdb}|${mal}`;
+  }
+
+  function simklBindKey() {
+    return `${location.pathname}${location.search}\u001e${simklContentFingerprint()}`;
+  }
+
+  function extractSimklPageIds() {
+    const path = parseSimklPathKind();
+    if (!path) return { imdb: null, tmdb: null, type: null, season: null, episode: null, mal: null };
+
+    let imdb = null;
+    const imdbA = document.querySelector(
+      'table.SimklTVAboutRatingsBlockTable td.imdb-rating a[href*="imdb.com/title/"], td.imdb-rating a[href*="imdb.com/title/"], .imdb-rating a[href*="imdb.com/title/"]'
+    );
+    if (imdbA) {
+      const href = (imdbA.getAttribute('href') || imdbA.href || '').trim();
+      const hm = href.match(/\/title\/(tt\d+)/i);
+      if (hm) imdb = hm[1];
+    }
+    if (!imdb) {
+      const hay = document.documentElement?.innerHTML || '';
+      const hm = hay.match(/imdb\.com\/title\/(tt\d+)/i);
+      if (hm) imdb = hm[1];
+    }
+
+    let tmdb = null;
+    let scrapedType = null;
+    for (const a of document.querySelectorAll('a[href*="themoviedb.org"]')) {
+      const abs = a.href || '';
+      const tm = abs.match(/themoviedb\.org\/(movie|tv)\/(\d+)/i);
+      if (tm) {
+        scrapedType = tm[1].toLowerCase();
+        tmdb = tm[2];
+        break;
+      }
+    }
+    if (tmdb && scrapedType) {
+      if (path.mediaType === 'movie' && scrapedType !== 'movie') { tmdb = null; scrapedType = null; }
+      else if (path.mediaType === 'tv' && scrapedType === 'movie') { tmdb = null; scrapedType = null; }
+    }
+    if (!tmdb) {
+      const hay = document.documentElement?.innerHTML || '';
+      const mm = hay.match(/themoviedb\.org\/(movie|tv)\/(\d+)/i);
+      if (mm) {
+        const ty = mm[1].toLowerCase();
+        const id = mm[2];
+        if (!(path.mediaType === 'movie' && ty !== 'movie') && !(path.mediaType === 'tv' && ty === 'movie')) {
+          scrapedType = ty;
+          tmdb = id;
+        }
+      }
+    }
+
+    let mal = null;
+    const malA = document.querySelector(
+      'table.SimklTVAboutRatingsBlockTable td.mal-rating a[href*="myanimelist.net/anime/"], td.mal-rating a[href*="myanimelist.net/anime/"], .mal-rating a[href*="myanimelist.net/anime/"]'
+    );
+    if (malA) {
+      const href = (malA.getAttribute('href') || malA.href || '').trim();
+      const mmal = href.match(/myanimelist\.net\/anime\/(\d+)/i);
+      if (mmal) mal = mmal[1];
+    }
+    if (!mal) {
+      const hayMal = document.documentElement?.innerHTML || '';
+      const mmal = hayMal.match(/myanimelist\.net\/anime\/(\d+)/i);
+      if (mmal) mal = mmal[1];
+    }
+
+    const resolvedType = tmdb && scrapedType ? scrapedType : path.mediaType;
+    return { imdb, tmdb, type: resolvedType, season: null, episode: null, mal };
+  }
+
+  function installSimklGlobalKeydownOnce() {
+    if (simklGlobalKeydownInstalled) return;
+    simklGlobalKeydownInstalled = true;
+    document.addEventListener('keydown', (e) => {
+      if (!e.shiftKey || e.key.toLowerCase() !== 'p') return;
+      if (!isSimkl || !SETTINGS.enableOnSimklPage || !isSimklTitleDetailPage()) return;
+      const ov = document.querySelector('.tmdb-overlay');
+      if (ov) {
+        ov.remove();
+        return;
+      }
+      const ids = simklOverlayPayloadRef || extractSimklPageIds();
+      if (ids.imdb || (ids.tmdb && ids.type) || ids.mal) void triggerTraktOverlay(ids);
+      else showNotification('No IMDb / TMDb / MAL links in Simkl ratings yet — wait for the page to finish loading.');
+    });
+  }
+
+  function injectSimklStreamingButton(onToggle) {
+    if (document.getElementById('tmdb-simkl-play')) return true;
+    const addUrl = document.querySelector('watch-now-button.settings.madripple')
+      || document.querySelector('watch-now-button.settings')
+      || Array.from(document.querySelectorAll('watch-now-button')).find(w => /add\s*url/i.test((w.textContent || '').replace(/\s+/g, ' ')))
+      || document.querySelector('watch-now-button');
+
+    const finish = (btn) => {
+      btn.id = 'tmdb-simkl-play';
+      btn.setAttribute('title', 'Watch now — TMDb links (toggle); Shift+P');
+      btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }, true);
+      if (addUrl?.parentElement) addUrl.insertAdjacentElement('afterend', btn);
+      else (document.querySelector('.SimklMyTVShowAboutDiv') || document.body).appendChild(btn);
+      return true;
+    };
+
+    const el = document.createElement('watch-now-button');
+    el.className = 'settings madripple';
+    el.innerHTML = `
+      <watch-now-1-1>
+        <watch-now-1-1-1></watch-now-1-1-1>
+        <watch-now-1-1-2>Watch now 😉</watch-now-1-1-2>
+        <watch-now-1-1-3></watch-now-1-1-3>
+      </watch-now-1-1>`;
+    return finish(el);
+  }
+
+  function scheduleSimklStreamingButton(onToggle, onSettled) {
+    let n = 0;
+    const max = 80;
+    const settled = (usedFallbackBar) => {
+      if (typeof onSettled === 'function') onSettled(!!usedFallbackBar);
+    };
+    const tick = () => {
+      if (document.getElementById('tmdb-simkl-play')) {
+        settled(n >= max);
+        return;
+      }
+      if (injectSimklStreamingButton(onToggle)) {
+        settled(false);
+        return;
+      }
+      if (++n >= max) {
+        if (!document.getElementById('tmdb-simkl-play')) {
+          const b = document.createElement('button');
+          b.id = 'tmdb-simkl-play';
+          b.type = 'button';
+          b.className = 'tmdb-btn primary';
+          b.style.cssText = 'margin:8px 12px;z-index:2147483000;position:relative;display:inline-flex;align-items:center;gap:8px;';
+          b.title = 'Watch now — Shift+P toggles overlay';
+          b.innerHTML = `${traktStylePlaySvgHtml()} <span>Watch now 😉</span>`;
+          b.addEventListener('click', (e) => { e.preventDefault(); onToggle(); });
+          document.body.insertAdjacentElement('afterbegin', b);
+        }
+        settled(true);
+        return;
+      }
+      setTimeout(tick, 200);
+    };
+    tick();
+  }
+
+  function bindSimklOverlayToPage(ids) {
+    const payload = { imdb: ids.imdb, tmdb: ids.tmdb, type: ids.type, season: ids.season, episode: ids.episode, mal: ids.mal };
+    simklOverlayPayloadRef = payload;
+    installSimklGlobalKeydownOnce();
+
+    const toggleOverlay = () => {
+      const ov = document.querySelector('.tmdb-overlay');
+      if (ov) {
+        ov.remove();
+        return;
+      }
+      void triggerTraktOverlay(simklOverlayPayloadRef || payload);
+    };
+
+    scheduleSimklStreamingButton(toggleOverlay, (usedFallbackBar) => {
+      if (!usedFallbackBar || !SETTINGS.enableNotifications) return;
+      const hintKey = simklBindKey();
+      if (simklLastFallbackHintKey === hintKey) return;
+      simklLastFallbackHintKey = hintKey;
+      showNotification('Couldn’t attach Watch next to Add URL — use the control at the top of the page or press Shift+P.', 5200);
+    });
+  }
+
+  function simklStopMutationObserver() {
+    try { simklMo?.disconnect(); } catch (e) { /* ignore */ }
+    simklMo = null;
+  }
+
+  function installSimklSpaHooksOnce() {
+    if (simklSpaHooksInstalled) return;
+    simklSpaHooksInstalled = true;
+    let rebindT = 0;
+    const onNav = () => {
+      if (rebindT) clearTimeout(rebindT);
+      rebindT = setTimeout(() => {
+        rebindT = 0;
+        lastSimklBindKey = '';
+        simklOverlayPayloadRef = null;
+        removeSimklInjections();
+        if (isSimklTitleDetailPage()) simklScheduleTitleRebind();
+        else simklStopMutationObserver();
+      }, 150);
+    };
+    window.addEventListener('popstate', onNav);
+    window.addEventListener('hashchange', onNav);
+    const wrap = (fn) =>
+      function () {
+        const ret = fn.apply(this, arguments);
+        onNav();
+        return ret;
+      };
+    history.pushState = wrap(history.pushState);
+    history.replaceState = wrap(history.replaceState);
+  }
+
+  function simklScheduleTitleRebind() {
+    if (!isSimklTitleDetailPage() || !SETTINGS.enableOnSimklPage) {
+      simklStopMutationObserver();
+      return;
+    }
+    simklStopMutationObserver();
+    const gen = ++simklRebindGen;
+    lastSimklBindKey = '';
+    simklOverlayPayloadRef = null;
+
+    const simklTryBindTitle = () => {
+      if (!isSimklTitleDetailPage()) return false;
+      if (!parseSimklPathKind()) return false;
+      const key = simklBindKey();
+      if (lastSimklBindKey === key) return true;
+      const ids = extractSimklPageIds();
+      if (!ids.imdb && !ids.tmdb && !ids.mal) return false;
+      if (lastSimklBindKey) removeSimklInjections();
+      lastSimklBindKey = key;
+      bindSimklOverlayToPage(ids);
+      return true;
+    };
+
+    let simklMoRaf = 0;
+    let lastMoFire = 0;
+    const MO_DEBOUNCE_MS = 200;
+    simklMo = new MutationObserver(() => {
+      const t = Date.now();
+      if (t - lastMoFire < MO_DEBOUNCE_MS) return;
+      lastMoFire = t;
+      if (simklMoRaf) return;
+      simklMoRaf = requestAnimationFrame(() => {
+        simklMoRaf = 0;
+        if (!isSimklTitleDetailPage()) return;
+        simklTryBindTitle();
+      });
+    });
+    simklMo.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'class', 'data-title', 'data-href'],
+    });
+
+    let tries = 0;
+    const maxTries = 60;
+    const tick = () => {
+      if (gen !== simklRebindGen) return;
+      if (!isSimklTitleDetailPage()) {
+        simklStopMutationObserver();
+        return;
+      }
+      if (simklTryBindTitle()) return;
+      if (++tries >= maxTries) {
+        if (gen !== simklRebindGen) return;
+        if (!isSimklTitleDetailPage()) return;
+        installSimklGlobalKeydownOnce();
+        showNotification('TMDb Enhancer: Waiting for Simkl ratings (IMDb / TMDb / MAL) — try Shift+P shortly.', 5500);
+        return;
+      }
+      setTimeout(tick, 400);
+    };
+    tick();
+  }
+
+  function simklPageHandler() {
+    installSimklSpaHooksOnce();
+    if (!isSimklTitleDetailPage()) return;
+    simklScheduleTitleRebind();
   }
 
   /* ----------------------------------------------------
@@ -2258,7 +2889,7 @@
       playBtn.id = "tmdb-yts-play";
       playBtn.className = "";
       playBtn.classList.add("button-green-download2-big", "hidden-xs", "hidden-sm");
-      playBtn.innerHTML = `<span class="icon-play"></span> Play`;
+      playBtn.innerHTML = `<span class="icon-play"></span> Watch Now 😉`;
       playBtn.href = "javascript:void(0);";
       playBtn.removeAttribute("data-target"); playBtn.removeAttribute("data-toggle");
       original.parentNode.insertBefore(playBtn, original.nextSibling);
@@ -2366,18 +2997,16 @@
     imdbHandler();
   } else if (isTrakt && SETTINGS.enableOnTraktPage) {
     traktPageHandler();
+  } else if (isSimkl && SETTINGS.enableOnSimklPage) {
+    simklPageHandler();
   } else if (isYTS) {
     ytsHandler();
   }
 
-  /* Floating settings FAB */
+  /* Floating settings FAB + Tampermonkey menu toggles */
   try {
-    const fab = document.createElement('button');
-    fab.id = 'tmdb-fab-settings';
-    fab.title = 'TMDb Script Settings (Shift+R)';
-    fab.innerHTML = '⚙';
-    fab.addEventListener('click', openSettingsPanel);
-    document.body.appendChild(fab);
+    registerFabMenuCommands();
+    applySettingsFab();
   } catch (e) { /* ignore */ }
 
 })();
