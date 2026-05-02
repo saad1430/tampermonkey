@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.12
+// @version      1.8.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -165,6 +165,7 @@
     enableStremioLink: true,
     enableTraktLink: true,
     enableTraktSearchLink: true,
+    enableSimklLink: true,
     enableEpisodeSelection: true,
     enableTrailerButton: true,
     enableTrailerAutoPlay: false,
@@ -203,11 +204,10 @@
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Added DuckDuckGo support</li>
       <li>Added Simkl support</li>
+      <li>Improved IMDb page layout detection</li>
       <li>Merged Trakt links for better compatibility</li>
       <li>Added Trakt V3 theme</li>
       <li>Added userscript menu to show/hide settings button</li>
-      <li>Added Brave Search support</li>
-      <li>Improved Automatic Media Detection</li>
       <li>Minor UI/UX improvements</li>
     </ul>
   `;
@@ -272,7 +272,8 @@
         lastInfoCardRender.imdb,
         lastInfoCardRender.season,
         lastInfoCardRender.episode,
-        lastInfoCardRender.ytsLanguage
+        lastInfoCardRender.ytsLanguage,
+        lastInfoCardRender.episodeDisplayName
       );
     } catch (e) { /* ignore */ }
     try { ensureChangeResultButton(); } catch (e) { /* ignore */ }
@@ -389,22 +390,66 @@
     }
     .tmdb-settings {
       width: clamp(50vw, 94vw, 560px);
-      max-height: 88vh; overflow: auto;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       border: 1px solid rgb(var(--tm-border));
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
     .tmdb-settings header {
+      flex-shrink: 0;
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px;
       border-bottom: 1px solid rgba(var(--tm-border) / 0.35);
     }
     .tmdb-settings header h2 { margin: 0; font-size: 18px; }
     .tmdb-settings .body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
       padding: 16px;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      display: grid;
+      /* At most ~3 columns: min track is max(160px, one-third of row minus gaps). Fewer columns on narrow widths. */
+      grid-template-columns: repeat(
+        auto-fill,
+        minmax(min(100%, max(160px, calc((100% - 24px) / 3))), 1fr)
+      );
+      gap: 12px;
+      align-items: start;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(var(--tm-accent) / 0.55) rgba(var(--tm-bg) / 0.4);
+    }
+    .tmdb-settings .body::-webkit-scrollbar {
+      width: 10px;
+    }
+    .tmdb-settings .body::-webkit-scrollbar-track {
+      background: rgba(var(--tm-bg) / 0.35);
+      border-radius: 999px;
+      margin: 4px 0;
+    }
+    .tmdb-settings .body::-webkit-scrollbar-thumb {
+      background: rgba(var(--tm-accent) / 0.45);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .tmdb-settings .body::-webkit-scrollbar-thumb:hover {
+      background: rgba(var(--tm-accent) / 0.7);
+      border: 2px solid transparent;
+      background-clip: padding-box;
     }
     .tmdb-settings .body .full { grid-column: 1 / -1; }
+    .tmdb-settings .body > label {
+      min-width: 0;
+      align-items: flex-start;
+    }
+    .tmdb-settings .body > label input[type="checkbox"] {
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
 
     /* ---- Theme picker row ---- */
     .tmdb-theme-row {
@@ -484,6 +529,7 @@
       border-radius: 8px; padding: 8px;
     }
     .tmdb-settings footer {
+      flex-shrink: 0;
       display: flex; gap: 8px; justify-content: flex-end;
       padding: 14px 16px;
       border-top: 1px solid rgba(var(--tm-border) / 0.35);
@@ -1101,14 +1147,15 @@
           ${checkbox('enableStremioLink', '"Open in Stremio" link', SETTINGS.enableStremioLink)}
           ${checkbox('enableTraktLink', 'Trakt link', SETTINGS.enableTraktLink)}
           ${checkbox('enableTraktSearchLink', 'Trakt search results link', SETTINGS.enableTraktSearchLink)}
-          ${checkbox('enableEpisodeSelection', 'Allow changing episode number (TV only)', SETTINGS.enableEpisodeSelection)}
+          ${checkbox('enableSimklLink', 'Simkl link', SETTINGS.enableSimklLink)}
           ${checkbox('enableTrailerButton', 'Watch trailer button', SETTINGS.enableTrailerButton)}
-          ${checkbox('enableTrailerAutoPlay', `Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" ${linkTargetAttr()}>[for constant volumes use this extension]</a>`, SETTINGS.enableTrailerAutoPlay)}
           ${checkbox('enableChangeResultButton', 'Change result button', SETTINGS.enableChangeResultButton)}
+          ${checkbox('enableEpisodeSelection', 'Allow changing episode number (TV only)', SETTINGS.enableEpisodeSelection, true)}
           ${checkbox('showCertifications', 'Certification', SETTINGS.showCertifications)}
           ${checkbox('enableTransparencyMode', 'Transparency/Glassy mode', SETTINGS.enableTransparencyMode)}
-          ${checkbox('showSettingsButton', 'Show settings button (⚠️ Use with caution) [Shift+R still opens settings; userscript menu toggles this button]', SETTINGS.showSettingsButton)}
           ${checkbox('debugNetworkRequests', 'Debug network requests (console logs)', SETTINGS.debugNetworkRequests)}
+          ${checkbox('enableTrailerAutoPlay', `Autoplay Trailer (beware of volume)<a href="https://www.mrfdev.com/enhancer-for-youtube" ${linkTargetAttr()}>[for constant volumes use this extension]</a>`, SETTINGS.enableTrailerAutoPlay, true)}
+          ${checkbox('showSettingsButton', 'Show settings button (⚠️ Use with caution) [Shift+R still opens settings; userscript menu toggles this button]', SETTINGS.showSettingsButton, true)}
 
           ${formatSpecialThanksHtml(true)}
 
@@ -1225,8 +1272,9 @@
     if (ov) ov.remove();
   }
 
-  function checkbox(id, label, checked) {
-    return `<label><input id="cb-${id}" type="checkbox" ${checked ? 'checked' : ''}> ${label}</label>`;
+  function checkbox(id, label, checked, fullRow) {
+    const rowClass = fullRow ? ' class="full"' : '';
+    return `<label${rowClass}><input id="cb-${id}" type="checkbox" ${checked ? 'checked' : ''}> ${label}</label>`;
   }
 
   /* Hotkey for settings panel (Shift+R) */
@@ -1454,7 +1502,7 @@
     return s || 'title';
   }
 
-  function buildTraktAppUrls(vidType, title, date, seasonNumber) {
+  function buildTraktAppUrls(vidType, title, date, seasonNumber, episodeNumber = null) {
     const base = slugifyForTraktPath(title);
     const yearMatch = String(date).match(/^(\d{4})/);
     const year = yearMatch ? yearMatch[1] : '';
@@ -1463,8 +1511,35 @@
       const slug = year ? `${base}-${year}` : base;
       return { direct: `https://app.trakt.tv/movies/${slug}?mode=media`, search: searchQ + `&m=movie` };
     }
-    const sn = Number.isFinite(Number(seasonNumber)) && Number(seasonNumber) > 0 ? Number(seasonNumber) : 1;
-    return { direct: `https://app.trakt.tv/shows/${base}?season=${sn}&mode=media`, search: searchQ + `&m=show` };
+    const snRaw = Number(seasonNumber);
+    const sn = Number.isFinite(snRaw) && snRaw >= 0 ? snRaw : 1;
+    const enRaw = episodeNumber != null && episodeNumber !== '' ? Number(episodeNumber) : NaN;
+    const en = Number.isFinite(enRaw) && enRaw > 0 ? enRaw : null;
+    const direct = en != null
+      ? `https://app.trakt.tv/shows/${base}/seasons/${sn}/episodes/${en}`
+      : `https://app.trakt.tv/shows/${base}?season=${sn}&mode=media`;
+    return { direct, search: searchQ + `&m=show` };
+  }
+
+  /** Stremio detail URL: episode-aware for TV when season & episode are known. */
+  function buildStremioDetailHref(vidType, imdb, seasonNum, episodeNum) {
+    if (!imdb) return '';
+    if (vidType === 'tv') {
+      const s = seasonNum != null && seasonNum !== '' ? Number(seasonNum) : NaN;
+      const e = episodeNum != null && episodeNum !== '' ? Number(episodeNum) : NaN;
+      if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && e > 0) {
+        return `stremio://detail/series/${encodeURIComponent(`imdb:${imdb}:${s}:${e}`)}`;
+      }
+    }
+    return `stremio://detail/${vidType}/${imdb}`;
+  }
+
+  function escapeHtmlText(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   /** Inline accent colour helper — used for links inside the info card HTML string */
@@ -1474,7 +1549,7 @@
   function imdbBgStyle() { return 'style="color:black;background-color:rgb(245 197 24);"'; }
   function traktStyle() { return 'style="color:rgb(237 95 36);font-weight:bold;"'; }
 
-  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null) {
+  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null, episodeDisplayName = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
     const date = data.release_date || data.first_air_date || 'Unknown Date';
@@ -1490,8 +1565,10 @@
     let eztv = '';
     let knabenCategory = '';
     let extCategory = '';
-    let season_number = specifiedSeason ? Number(specifiedSeason) : 1;
-    let episode_number = specifiedEpisode ? Number(specifiedEpisode) : 1;
+    const seasonParsed = specifiedSeason != null && specifiedSeason !== '' ? Number(specifiedSeason) : NaN;
+    const episodeParsed = specifiedEpisode != null && specifiedEpisode !== '' ? Number(specifiedEpisode) : NaN;
+    let season_number = Number.isFinite(seasonParsed) ? seasonParsed : 1;
+    let episode_number = Number.isFinite(episodeParsed) ? episodeParsed : 1;
     let sxe = '';
     let torrentLinks = [];
 
@@ -1525,13 +1602,22 @@
       showNotification('No Results found!'); hideButton(); return;
     }
 
-    const traktUrls = buildTraktAppUrls(vidType, title, date, season_number);
-    lastInfoCardRender = { data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage };
+    const traktUrls = buildTraktAppUrls(vidType, title, date, season_number, episode_number);
+    const stremioHref = buildStremioDetailHref(vidType, imdb, season_number, episode_number);
+    lastInfoCardRender = {
+      data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage, episodeDisplayName,
+    };
+
+    const episodeSub =
+      Type === 'tv' && episodeDisplayName
+        ? `<div class="tmdb-episode-sub" style="opacity:0.92;font-size:15px;margin-top:4px;font-weight:600;">S${season_number}E${episode_number} · ${escapeHtmlText(episodeDisplayName)}</div>`
+        : '';
 
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
     container.innerHTML = `
       <div class="tmdb-title">${title} (${date})</div>
+      ${episodeSub}
       <div id="tmdb-details">
         <div>
           <strong>TMDb ID:</strong>
@@ -1545,8 +1631,9 @@
                     <a href="https://www.imdb.com/title/${imdb}/parentalguide" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide${linkExternalTabArrow()})</a>` : ''}
                     ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:bold;">(Trakt${linkExternalTabArrow()})</a>` : ''}
                     ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
+                    ${SETTINGS.enableSimklLink ? `<a href="https://simkl.com/search?q=https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#fff;background-color:#000;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Simkl${linkExternalTabArrow()})</a></span>` : ''}
         </div>
-        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="stremio://detail/${vidType}/${imdb}" ${accentStyle()}>Open in Stremio${linkExternalTabArrow()}</a></div>` : ''}
+        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="${stremioHref}" ${accentStyle()}>Open in Stremio${linkExternalTabArrow()}</a></div>` : ''}
 
         ${SETTINGS.enableStreamingLinks ? `
         <div style="margin-top:6px;">
@@ -1818,7 +1905,7 @@
     document.body.appendChild(overlay);
   }
 
-  async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null) {
+  async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null, episodeDisplayName = null, seriesImdbForLinks = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
     const ytsAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
     const ytsAltAPI = `https://movies-api.accel.li/api/v2/list_movies.json?query_term=`;
@@ -1827,11 +1914,14 @@
       if (existing) existing.remove();
 
       const apiKey = getNextApiKey();
-      let imdbId = null;
-      if (isImdb) { imdbId = location.pathname.match(/title\/(tt\d+)/)?.[1]; }
+      let imdbIdFromPage = null;
+      if (isImdb) { imdbIdFromPage = location.pathname.match(/title\/(tt\d+)/)?.[1]; }
       let imdb_id = null;
-      if (imdbId) {
-        imdb_id = imdbId;
+      const seriesImdbNorm = seriesImdbForLinks && String(seriesImdbForLinks).trim() ? String(seriesImdbForLinks).trim() : null;
+      if (seriesImdbNorm) {
+        imdb_id = seriesImdbNorm.startsWith('tt') ? seriesImdbNorm : `tt${seriesImdbNorm}`;
+      } else if (imdbIdFromPage) {
+        imdb_id = imdbIdFromPage;
       } else if (result.external_imdb) {
         imdb_id = result.external_imdb;
       } else {
@@ -1844,7 +1934,6 @@
           tmdbExternalIdsCache.set(extKey, imdb_id);
         }
       }
-
       if (result.media_type === 'movie') {
         if (SETTINGS.enableYtsTorrents) {
           try {
@@ -1857,11 +1946,11 @@
               if (imdb_id) ytsMovieListCache.set(imdb_id, magnetData);
             }
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
-              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language);
-            } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
-          } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
-        } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
-      } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null); }
+              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language, episodeDisplayName);
+            } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
+          } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
+        } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
+      } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
 
       if (SETTINGS.showCertifications) addCertificationAsync(result.id, result.media_type);
     } catch (err) { showNotification('Failed to process selected result'); }
@@ -2056,10 +2145,31 @@
       if (imdbCache.has(imdbId)) return renderOverlayFromCache(imdbCache.get(imdbId));
       const apiKey = getNextApiKey();
       const json = await tmdbApiGetJson(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
-      const data = json.movie_results?.[0] || json.tv_results?.[0];
-      if (!data) { showNotification('TMDb match not found for this IMDb ID.'); if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Watch Now 😉'; } return; }
-      imdbCache.set(imdbId, data);
-      renderOverlayFromCache(data);
+      const movie = json.movie_results?.[0];
+      const tv = json.tv_results?.[0];
+      const tvep = json.tv_episode_results?.[0];
+      let result = movie || tv;
+      let season = null;
+      let episode = null;
+      let episodeTitle = null;
+      let seriesImdbId = null;
+      if (!result && tvep != null && tvep.show_id != null) {
+        result = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tvep.show_id}?api_key=${apiKey}`);
+        result.media_type = 'tv';
+        if (tvep.season_number != null) season = tvep.season_number;
+        if (tvep.episode_number != null) episode = tvep.episode_number;
+        if (typeof tvep.name === 'string' && tvep.name.trim()) episodeTitle = tvep.name.trim();
+        const extJson = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tvep.show_id}/external_ids?api_key=${apiKey}`);
+        const rawShowImdb = extJson.imdb_id || null;
+        if (rawShowImdb) {
+          seriesImdbId = rawShowImdb.startsWith('tt') ? rawShowImdb : `tt${rawShowImdb}`;
+          tmdbExternalIdsCache.set(`tv:${tvep.show_id}`, seriesImdbId);
+        }
+      }
+      if (!result) { showNotification('TMDb match not found for this IMDb ID.'); if (bttn) { bttn.disabled = false; bttn.textContent = '▶ Watch Now 😉'; } return; }
+      const cached = { result, season, episode, episodeTitle, seriesImdbId };
+      imdbCache.set(imdbId, cached);
+      renderOverlayFromCache(cached);
     } catch (err) {
       console.error('IMDb overlay error:', err);
       showNotification('Failed to fetch TMDb info.');
@@ -2068,14 +2178,19 @@
     }
   }
 
-  async function renderOverlayFromCache(data) {
+  async function renderOverlayFromCache(cached) {
+    const result = cached && typeof cached === 'object' && 'result' in cached ? cached.result : cached;
+    const season = cached && typeof cached === 'object' && 'season' in cached ? cached.season : null;
+    const episode = cached && typeof cached === 'object' && 'episode' in cached ? cached.episode : null;
+    const episodeTitle = cached && typeof cached === 'object' && cached.episodeTitle ? cached.episodeTitle : null;
+    const seriesImdbId = cached && typeof cached === 'object' && cached.seriesImdbId ? cached.seriesImdbId : null;
     document.querySelector('.tmdb-overlay')?.remove();
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-overlay';
     overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    await processSearchResult(data);
+    await processSearchResult(result, season, episode, episodeTitle, seriesImdbId);
     const infoCard = document.querySelector('.tmdb-info-card');
     if (infoCard) overlay.querySelector('#tmdb-overlay-inner').appendChild(infoCard);
     else overlay.remove();
@@ -2999,7 +3114,7 @@
     traktPageHandler();
   } else if (isSimkl && SETTINGS.enableOnSimklPage) {
     simklPageHandler();
-  } else if (isYTS) {
+  } else if (isYTS && SETTINGS.enableOnYTSPage) {
     ytsHandler();
   }
 

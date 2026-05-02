@@ -2,22 +2,22 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.7.12` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.8.0` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
 ## What does it do?
 
-On **Google**, **Bing**, **Brave**, and **DuckDuckGo**, the script can automatically detect many movie/TV searches and inject an info card (with a **Search Movie/TV Info** fallback button when auto-detect does not fire). On DuckDuckGo the card is placed **below the filter bar** and **above the main result list** so it stays in the natural reading order.
+On **Google**, **Bing**, **Brave**, and **DuckDuckGo**, the script can automatically detect many movie/TV searches and inject an info card (with a **Search Movie/TV Info** fallback button when auto-detect does not fire).
 
 - **TMDb & IMDb IDs** — click to copy either one instantly
 - **Streaming links** — a curated list of working players, updated regularly.
-- **Frontend links** — full-featured movie sites (Cineby, CinemaOS, ShuttleTV, Hexa, and more)
-- **Torrent links** — direct magnet links from YTS (movies), plus shortcuts to 1337x, EZTV, TPB, and others
-- **Stremio deep-link** — opens the title directly in your Stremio app
-- **Trakt links** — jump straight to the title on app.trakt.tv
-- **Watch Trailer** — plays the official YouTube trailer in a popup, no new tab needed
-- **Content rating** — fetches the MPAA/TV certification (e.g. PG-13, TV-MA)
+- **Frontend links** — full-featured movie sites
+- **Torrent links** — direct magnet links from YTS, plus shortcuts to torrent sites
+- **Stremio deep-link** — opens the title directly in your [Stremio](https://stremio.com) app
+- **Trakt links** — jump straight to the title on [Trakt](https://app.trakt.tv)
+- **Watch Trailer** — plays the official YouTube trailer in a popup
+- **Content rating** — fetches the certification (e.g. PG-13, TV-MA)
 
 For **TV shows** specifically, you also get episode controls — pick any season and episode and all the player links update automatically.
 
@@ -31,7 +31,7 @@ For **TV shows** specifically, you also get episode controls — pick any season
 | Bing Search | Same as Google |
 | Brave Search | Same as Google |
 | DuckDuckGo | Same as Google |
-| IMDb title pages | Adds a **▶ Watch Now** button next to the `watchlist` button (or use **Shift+P**) |
+| IMDb | Adds a **▶ Watch Now** button next to the `watchlist` button (or use **Shift+P**) |
 | Trakt | Adds a **▶ Watch Now** button next to the `track` button (or use **Shift+P**) |
 | Simkl | Adds a **▶ Watch Now** button next to the `Add URL` button (or use **Shift+P**) |
 | YTS | Adds a **▶ Watch Now** button next to the `download` button (or use **Shift+P**) |
@@ -172,7 +172,8 @@ Issues and small PRs are equally valued. Maintainers here are **you**: the peopl
 ## Special Thanks
 
 - [FMHY](https://fmhy.net)
-- Everyone who [starred the repo](https://github.com/saad1430/tampermonkey)
+- Everyone who [starred the repo ⭐](https://github.com/saad1430/tampermonkey)
+- [Enhancer for Youtube](https://www.mrfdev.com/enhancer-for-youtube) for being a goated extension for youtube
 
 ---
 
