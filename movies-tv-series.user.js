@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.7.10
+// @version      1.7.11
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -19,10 +19,7 @@
 // @match        https://imdb.com/title/*
 // @match        https://trakt.tv/movies/*
 // @match        https://trakt.tv/shows/*
-// @match        https://app.trakt.tv/movies/*
-// @match        https://app.trakt.tv/shows/*
-// @match        https://app.trakt.tv/shows/*/seasons/*
-// @match        https://app.trakt.tv/shows/*/seasons/*/episodes/*
+// @match        https://app.trakt.tv/*
 // @match        https://simkl.com/tv/*
 // @match        https://simkl.com/movies/*
 // @match        https://themoviedb.org/movie/*
@@ -92,6 +89,14 @@
       text:    '232 232 232',  // #e8e8e8 light grey text
       border:  '237 95 36',    // #ed5f24 orange border
     },
+    traktv3: {
+      label: 'Trakt V3',
+      bg:      '26 26 26',     // #1a1a1a almost black
+      surface: '34 36 40',     // #222428 dark grey
+      accent:  '159 66 198',    // #9f42c6 Trakt orange
+      text:    '229 229 230',  // #e5e5e6 light grey text
+      border:  '159 66 198',    // #9f42c6 orange border
+    },
     custom: {
       label: 'Custom',
       /* values are placeholders — real values come from SETTINGS.customTheme* */
@@ -143,6 +148,7 @@
     enableOnGooglePage: true,
     enableOnBingPage: true,
     enableOnBravePage: true,
+    enableOnDuckDuckGoPage: true,
     enableOnImdbPage: true,
     enableOnTraktPage: true,
     enableOnYTSPage: true,
@@ -164,14 +170,22 @@
     openLinksInNewTab: true,
 
     /* ---- Theme ---- */
-    activeTheme: 'tmdb',            // 'tmdb' | 'imdb' | 'trakt' | 'custom'
+    activeTheme: 'tmdb',            // 'tmdb' | 'imdb' | 'trakt' | 'traktv3' | 'custom'
     /* Custom theme color values as space-separated RGB triplets */
-    customThemeBg:      '14 16 55',
-    customThemeSurface: '20 24 80',
-    customThemeAccent:  '99 179 237',
+    customThemeBg:      '20 20 20',
+    customThemeSurface: '30 30 30',
+    customThemeAccent:  '255 0 0',
     customThemeText:    '226 232 240',
-    customThemeBorder:  '99 179 237',
+    customThemeBorder:  '255 0 0',
   };
+
+  const CUSTOM_THEME_FIELDS = [
+    { key: 'customThemeBg',      label: 'Background' },
+    { key: 'customThemeSurface', label: 'Surface' },
+    { key: 'customThemeAccent',  label: 'Accent' },
+    { key: 'customThemeText',    label: 'Text' },
+    { key: 'customThemeBorder',  label: 'Border' },
+  ];
 
   /* ----------------------------------------------------
   * Announcements (What's New)
@@ -182,6 +196,8 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
+      <li>Added Trakt V3 theme</li>
+      <li>Merged Trakt links for better compatibility</li>
       <li>Added Brave Search support</li>
       <li>Improved Automatic Media Detection</li>
     </ul>
@@ -418,6 +434,11 @@
     }
     .tmdb-custom-colors .rgb-preview {
       font-size: 11px; opacity: 0.65; font-family: monospace;
+    }
+    .tmdb-custom-colors .tmdb-custom-theme-reset {
+      grid-column: 1 / -1;
+      display: flex; justify-content: flex-end;
+      margin-top: 2px;
     }
 
     /* ---- Settings misc ---- */
@@ -702,6 +723,14 @@
   const isTrakt = hostname.includes('trakt.tv');
   const isYTS = hostname.includes('yts.') || hostname.includes('yts.mx') || hostname.includes('yts.bz') || hostname.includes('yts.lt') || hostname.includes('yts.ag') || hostname.includes('yts.am') || hostname.includes('yts.gg');
 
+  function currentSerpEngineEnabled() {
+    if (isGoogle) return SETTINGS.enableOnGooglePage;
+    if (isBing) return SETTINGS.enableOnBingPage;
+    if (isBrave) return SETTINGS.enableOnBravePage;
+    if (isDuckDuckGo) return SETTINGS.enableOnDuckDuckGoPage;
+    return false;
+  }
+
   function isSearch() {
     if (isGoogle || isBing || isBrave || isDuckDuckGo) return true;
   }
@@ -723,8 +752,26 @@
       return null;
     }
     if (isBrave) return params.get('q') || params.get('query') || params.get('search') || null;
-    if (isDuckDuckGo) return params.get('q');
+    if (isDuckDuckGo) {
+      const fromQs = params.get('q');
+      if (fromQs && fromQs.trim()) return fromQs.trim();
+      const input = document.querySelector('#searchbox_input, input[name="q"], textarea[name="q"]');
+      const fromDom = input?.value?.trim();
+      if (fromDom) return fromDom;
+      return null;
+    }
     return null;
+  }
+
+  /** DuckDuckGo React SERP: insert inside mainline section so the card sits under filter chips and above result rows. */
+  function getDuckDuckGoMountPoint() {
+    const mainline = document.querySelector('section[data-testid="mainline"], section[data-area="mainline"]');
+    if (mainline?.isConnected) return mainline;
+    const ol = document.querySelector('ol.react-results--main');
+    if (ol?.parentElement?.isConnected) return ol.parentElement;
+    const vertical = document.querySelector('[data-testid="web-vertical"]');
+    if (vertical?.isConnected) return vertical;
+    return document.querySelector('.results--main') || document.body;
   }
 
   function getInsertionPoint() {
@@ -742,7 +789,7 @@
         || document.body;
     }
     if (isBrave) return document.getElementById('results') || document.body;
-    if (isDuckDuckGo) return document.querySelector('.results--main') || document.body;
+    if (isDuckDuckGo) return getDuckDuckGoMountPoint();
     return document.body;
   }
 
@@ -775,7 +822,7 @@
       return u?.isConnected ? u : document.body;
     }
     if (isDuckDuckGo) {
-      const u = document.querySelector('.results--main')
+      const u = getDuckDuckGoMountPoint()
         || (parent?.isConnected ? parent : null)
         || document.body;
       return u?.isConnected ? u : document.body;
@@ -828,13 +875,7 @@
     ).join('');
 
     /* Build custom-colour inputs (hidden unless custom theme is active) */
-    const customColorFields = [
-      { key: 'customThemeBg',      label: 'Background' },
-      { key: 'customThemeSurface', label: 'Surface' },
-      { key: 'customThemeAccent',  label: 'Accent' },
-      { key: 'customThemeText',    label: 'Text' },
-      { key: 'customThemeBorder',  label: 'Border' },
-    ].map(({ key, label }) => {
+    const customColorFields = CUSTOM_THEME_FIELDS.map(({ key, label }) => {
       const triplet = SETTINGS[key] || DEFAULT_SETTINGS[key];
       const hex = rgbTripletToHex(triplet);
       return `
@@ -864,12 +905,16 @@
           <!-- Custom colour swatches (shown only when custom is selected) -->
           <div class="tmdb-custom-colors full" id="tmdb-custom-colors-section" style="display:${curTheme === 'custom' ? 'grid' : 'none'};">
             ${customColorFields}
+            <div class="tmdb-custom-theme-reset">
+              <button type="button" class="tmdb-btn ghost" id="tmdb-reset-custom-theme">Reset custom colors to default</button>
+            </div>
           </div>
 
           ${checkbox('autoDetectOnSERP', 'Auto-detect Movies/TV Shows', SETTINGS.autoDetectOnSERP)}
           ${checkbox('enableOnGooglePage', 'Google support', SETTINGS.enableOnGooglePage)}
           ${checkbox('enableOnBingPage', 'Bing support', SETTINGS.enableOnBingPage)}
           ${checkbox('enableOnBravePage', 'Brave support', SETTINGS.enableOnBravePage)}
+          ${checkbox('enableOnDuckDuckGoPage', 'DuckDuckGo support', SETTINGS.enableOnDuckDuckGoPage)}
           ${checkbox('enableOnImdbPage', 'IMDB support', SETTINGS.enableOnImdbPage)}
           ${checkbox('enableOnTraktPage', 'Trakt support', SETTINGS.enableOnTraktPage)}
           ${checkbox('enableOnYTSPage', 'YTS support', SETTINGS.enableOnYTSPage)}
@@ -940,6 +985,22 @@
         }
       });
     });
+
+    const resetCustomThemeBtn = overlay.querySelector('#tmdb-reset-custom-theme');
+    if (resetCustomThemeBtn) {
+      resetCustomThemeBtn.addEventListener('click', () => {
+        CUSTOM_THEME_FIELDS.forEach(({ key }) => {
+          const triplet = DEFAULT_SETTINGS[key];
+          const picker = overlay.querySelector(`#cc-${key}`);
+          const prevEl = overlay.querySelector(`#ccprev-${key}`);
+          if (picker) picker.value = rgbTripletToHex(triplet);
+          if (prevEl) prevEl.textContent = triplet;
+          SETTINGS[key] = triplet;
+        });
+        if (themeSelect.value === 'custom') applyTheme('custom');
+        showNotification('Custom theme colors reset to defaults (click Save to persist).', 4000);
+      });
+    }
 
     document.getElementById('tmdb-close').onclick = closeSettingsPanel;
 
@@ -1118,10 +1179,31 @@
     return organicStrictRe.test(resultsRoot.innerText);
   }
 
+  function scanDuckDuckGoForMediaHints() {
+    if (!isDuckDuckGo || !SETTINGS.enableOnDuckDuckGoPage) return false;
+    if (serpQueryLooksLikeNonMediaLookup(getSearchQuery())) return false;
+    if (serpHasMovieTvJsonLd()) return true;
+    if (serpHasSchemaMicrodata()) return true;
+
+    const ddgRoots = ['[data-testid="web-vertical"]', 'section[data-testid="mainline"]', 'section[data-area="mainline"]', 'ol.react-results--main', '[data-testid="sidebar"]', 'main'];
+    if (serpRootsContainMediaSiteLinks(ddgRoots)) return true;
+
+    const resultsRoot = document.querySelector('[data-testid="web-vertical"]')
+      || document.querySelector('section[data-testid="mainline"]')
+      || document.querySelector('ol.react-results--main')
+      || document.body;
+    const knowledgePanelRe = /\bTV series\b|\bTV show\b|Run time|Running time|Where to watch|Original network|Film series|\bSeasons?\s*\d|Watch on\b|\bEpisodes?\b[^.\n]{0,80}\bSeason\b/i;
+    if (knowledgePanelRe.test(resultsRoot.innerText)) return true;
+
+    const organicStrictRe = /\bTV series\b|\bTV show\b|Running time|Where to watch|Film series|\bEpisodes?\b[^.\n]{0,120}\bSeason\b/i;
+    return organicStrictRe.test(resultsRoot.innerText);
+  }
+
   function serpLooksLikeMedia() {
     if (isGoogle && SETTINGS.enableOnGooglePage) return scanGoogleForMediaHints();
     if (isBing && SETTINGS.enableOnBingPage) return scanBingForMediaHints();
     if (isBrave && SETTINGS.enableOnBravePage) return scanBraveForMediaHints();
+    if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) return scanDuckDuckGoForMediaHints();
     return false;
   }
 
@@ -1686,6 +1768,7 @@
   }
 
   function ensureSerpManualButton() {
+    if (isSearch() && !currentSerpEngineEnabled()) return;
     const mount = getMountTarget();
     if (!mount?.isConnected) return;
     if (mount.querySelector('.tmdb-info-card')) return;
@@ -1695,6 +1778,7 @@
       existing.disabled = false;
       existing.style.display = 'block';
       if (isBing) { existing.style.position = 'relative'; existing.style.zIndex = '2147483000'; existing.style.margin = '12px 0'; }
+      else if (isDuckDuckGo) { existing.style.position = 'relative'; existing.style.zIndex = ''; existing.style.margin = '12px 0'; }
       return;
     }
     const btn = document.createElement('button');
@@ -1702,6 +1786,7 @@
     btn.id = 'tmdb-button';
     btn.style.display = 'block';
     if (isBing) { btn.style.position = 'relative'; btn.style.zIndex = '2147483000'; btn.style.margin = '12px 0'; }
+    else if (isDuckDuckGo) { btn.style.position = 'relative'; btn.style.margin = '12px 0'; }
     btn.onclick = () => {
       void (async () => {
         const ok = await fetchWithFallback(cleanedQuery);
@@ -2187,7 +2272,7 @@
   /* ----------------------------------------------------
   * Action time
   * -------------------------------------------------- */
-  if (isSearch()) {
+  if (isSearch() && currentSerpEngineEnabled()) {
     let serpAutoFetchTriggered = false;
     async function runSerpAutoFetchOnce() {
       if (serpAutoFetchTriggered || !SETTINGS.autoDetectOnSERP) return;
@@ -2198,9 +2283,11 @@
     }
 
     if (SETTINGS.autoDetectOnSERP && serpLooksLikeMedia()) {
-      // Brave results can re-render after load; delay the fetch a bit so the injected card survives.
+      // Brave / DuckDuckGo results can re-render after load; delay the fetch so the injected card survives.
       if (isBrave && SETTINGS.enableOnBravePage) {
         setTimeout(() => void runSerpAutoFetchOnce(), 2200);
+      } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
+        setTimeout(() => void runSerpAutoFetchOnce(), 1800);
       } else {
         void runSerpAutoFetchOnce();
       }
@@ -2211,14 +2298,17 @@
     if (SETTINGS.autoDetectOnSERP && !serpAutoFetchTriggered) {
       const isBingSerp = isBing && SETTINGS.enableOnBingPage;
       const isBraveSerp = isBrave && SETTINGS.enableOnBravePage;
+      const isDdgSerp = isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage;
       const moRoot = isGoogle && SETTINGS.enableOnGooglePage
         ? (document.getElementById('main') || document.body)
         : isBingSerp ? document.body
           : isBraveSerp ? (document.getElementById('results') || document.body)
-            : null;
+            : isDdgSerp ? (document.querySelector('[data-testid="web-vertical"]') || document.body)
+              : null;
       if (moRoot) {
         let moRaf = 0;
         let braveDebounce = 0;
+        let ddgDebounce = 0;
         const scheduleSerpTry = () => {
           if (isBraveSerp) {
             if (braveDebounce) clearTimeout(braveDebounce);
@@ -2226,17 +2316,26 @@
             braveDebounce = setTimeout(() => { braveDebounce = 0; void runSerpAutoFetchOnce(); }, 1700);
             return;
           }
+          if (isDdgSerp) {
+            if (ddgDebounce) clearTimeout(ddgDebounce);
+            ddgDebounce = setTimeout(() => { ddgDebounce = 0; void runSerpAutoFetchOnce(); }, 1200);
+            return;
+          }
           if (moRaf) return;
           moRaf = requestAnimationFrame(() => { moRaf = 0; void runSerpAutoFetchOnce(); });
         };
         const mo = new MutationObserver(scheduleSerpTry);
         mo.observe(moRoot, { childList: true, subtree: true });
-        const observeMs = isBingSerp ? 25000 : isBraveSerp ? 35000 : 15000;
+        const observeMs = isBingSerp ? 25000 : isBraveSerp ? 35000 : isDdgSerp ? 32000 : 15000;
         setTimeout(() => { try { mo.disconnect(); } catch (e) { /* ignore */ } }, observeMs);
         scheduleSerpTry();
         if (isBraveSerp) {
           setTimeout(() => void runSerpAutoFetchOnce(), 2600);
           setTimeout(() => void runSerpAutoFetchOnce(), 7500);
+        } else if (isDdgSerp) {
+          setTimeout(() => void runSerpAutoFetchOnce(), 600);
+          setTimeout(() => void runSerpAutoFetchOnce(), 2400);
+          setTimeout(() => void runSerpAutoFetchOnce(), 7200);
         } else {
           setTimeout(() => void runSerpAutoFetchOnce(), 400);
           setTimeout(() => void runSerpAutoFetchOnce(), 2000);
@@ -2248,11 +2347,15 @@
       }
     }
 
-    if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage)) {
+    if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage) || (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage)) {
       if (isBrave && SETTINGS.enableOnBravePage) {
         setTimeout(() => ensureSerpManualButton(), 2800);
         setTimeout(() => ensureSerpManualButton(), 8000);
         setTimeout(() => ensureSerpManualButton(), 15000);
+      } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
+        setTimeout(() => ensureSerpManualButton(), 400);
+        setTimeout(() => ensureSerpManualButton(), 1800);
+        setTimeout(() => ensureSerpManualButton(), 4500);
       } else {
         setTimeout(() => ensureSerpManualButton(), 150);
         setTimeout(() => ensureSerpManualButton(), 900);

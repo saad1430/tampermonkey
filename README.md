@@ -1,17 +1,17 @@
 # Movie/TV Shows Links Aggregator
 
-> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your Google, Bing, or DuckDuckGo search results, IMDb, Trakt, or YTS pages.
+> A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, IMDb, Trakt, or YTS pages.
 
-**Current version:** `1.7.10` &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** MIT
+**Current version:** `1.7.11` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
 ## What does it do?
 
-When you search for a movie or TV show on **Google** or **Bing**, the script can automatically detect it and add a card to your results with everything you need in one place. On **DuckDuckGo**, use the **Search Movie/TV Info** button to fetch the same card (automatic detection is not wired up for DDG yet).
+On **Google**, **Bing**, **Brave**, and **DuckDuckGo**, the script can automatically detect many movie/TV searches and inject an info card (with a **Search Movie/TV Info** fallback button when auto-detect does not fire). On DuckDuckGo the card is placed **below the filter bar** and **above the main result list** so it stays in the natural reading order.
 
 - **TMDb & IMDb IDs** — click to copy either one instantly
-- **Streaming links** — a curated list of working players, updated regularly. CineSrc.st also supports direct download, shown inline next to its watch link
+- **Streaming links** — a curated list of working players, updated regularly.
 - **Frontend links** — full-featured movie sites (Cineby, CinemaOS, ShuttleTV, Hexa, and more)
 - **Torrent links** — direct magnet links from YTS (movies), plus shortcuts to 1337x, EZTV, TPB, and others
 - **Stremio deep-link** — opens the title directly in your Stremio app
@@ -29,12 +29,12 @@ For **TV shows** specifically, you also get episode controls — pick any season
 |---|---|
 | Google Search | Auto-detects movie/TV searches and injects the info card |
 | Bing Search | Same as Google |
-| DuckDuckGo | Injects **Search Movie/TV Info** — click it to load the card (no Google/Bing-style auto-detect yet) |
-| Brave Search | Same as Google: auto-detects movie/TV searches and injects the info card |
+| Brave Search | Same as Google |
+| DuckDuckGo | Same as Google |
 | IMDb title pages | Adds a **▶ Play** button next to the watchlist button (or use **Shift+P**) |
-| Trakt (`trakt.tv`, `app.trakt.tv`, season/episode URLs) | Adds a play control / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) — improved v3 layout support |
-| SIMKL & TMDb title pages (`simkl.com`, `themoviedb.org`) | Matched for upcoming integration; in-app links are being expanded |
+| Trakt (V3 only) | Adds a play control / hooks Trakt’s **Watch** action to open the overlay (or use **Shift+P**) |
 | YTS movie pages (`yts.mx`, `yts.lt`, `yts.bz`, …) | Adds a **Play** button next to the download button |
+| SIMKL & TMDb title pages (`simkl.com`, `themoviedb.org`) | Matched for upcoming integration |
 
 ---
 
@@ -65,7 +65,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Setting | What it does |
 |---|---|
 | Auto-detect Movies/TV | Automatically shows the card when a media search is detected |
-| Google / Bing / IMDb / Trakt / YTS support | Turn the script on or off per supported site |
+| Google / Bing / Brave / DuckDuckGo / IMDb / Trakt / YTS support | Turn the script on or off per supported site |
 | Debug network requests | Logs TMDb requests to the browser console (for troubleshooting) |
 | Streaming links | The main list of watch links |
 | Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
@@ -81,7 +81,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Change result button | Lets you pick a different TMDb result if the first one is wrong (Google/Bing search only) |
 | Certification | Displays the content rating (e.g. PG-13, TV-MA) |
 | Transparency/Glassy mode | Makes modals and panels use a frosted-glass look |
-| Theme | Switch between **TMDb**, **IMDb**, **Trakt**, or a **Custom** colour scheme |
+| Theme | Switch between **TMDb**, **IMDb**, **Trakt**, **Trakt V3**, or **Custom** colours; **Reset custom colors to default** restores the built-in custom palette |
 | Notifications | Toast notifications for actions and status |
 
 ---
@@ -97,7 +97,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 
 ## How the auto-detect works
 
-On **Google** and **Bing**, the script scans the page for signs that you're searching for a movie or TV show — things like JSON-LD schema data, links to IMDb/TMDb/Rotten Tomatoes, and knowledge-panel-style keywords. If it finds a match, the info card appears automatically. If it doesn't auto-detect, a **"Search Movie/TV Info"** button appears at the top of results. On **DuckDuckGo**, that manual button is always how you open the card for your current query.
+On **Google**, **Bing**, **Brave**, and **DuckDuckGo**, the script scans the page for signals such as JSON-LD / schema.org markup, links to IMDb/TMDb/Rotten Tomatoes (and similar), and panel or snippet text that looks like a film or TV listing. If it finds a match, the info card appears automatically. If not, use **Search Movie/TV Info** with your current query. Disable auto-detect in settings if you only want the manual button.
 
 ---
 
@@ -117,12 +117,14 @@ For **torrents**, YTS magnet links are fetched live and include quality, file si
 
 > **Notice:** I am **not affiliated with, endorsed by, or otherwise linked to** any of the third-party sites or services whose URLs this script shows. I **only aggregate links** to pages that already exist on the public web; this project does not host, upload, or distribute any audio or video. If you have a **copyright or DMCA** issue, please contact the **actual site** that hosts or serves the content — that operator is the right party to speak to, not this repository or its author.
 
+For a fuller statement on liability, third-party sites, and user responsibility (not legal advice), see **[DISCLAIMER.md](DISCLAIMER.md)**.
+
 ---
 
 ## Troubleshooting
 
 **The card didn't appear automatically**
-→ Click the "Search Movie/TV Info" button at the top of results. You can also try adding more specific terms to your search (e.g. the year or "movie").
+→ Click the "Search Movie/TV Info" button at the top of results. You can also try adding more specific terms to your search (e.g. "movie" or "series").
 
 **"No API key" prompt keeps appearing**
 → Open settings with Shift+R, scroll to the API keys field, and paste your key there.
@@ -166,10 +168,12 @@ Issues and small PRs are equally valued. Maintainers here are **you**: the peopl
 ## Special Thanks
 
 - [FMHY](https://fmhy.net)
-- Everyone who [stars the repo](https://github.com/saad1430/tampermonkey)
+- Everyone who [starred the repo](https://github.com/saad1430/tampermonkey)
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **[MIT License](LICENSE)**. The copyright notice in that file reads **© 2025–2026 Saad1430 Tampermonkey scripts**.
+
+**Disclaimer:** **[DISCLAIMER.md](DISCLAIMER.md)** describes how this software relates to third-party links and media, limits of liability, and that users are responsible for lawful use. It does not replace legal advice.
