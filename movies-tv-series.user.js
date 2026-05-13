@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.8.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -206,6 +206,7 @@
       <li>Updated Playback links</li>
       <li>Added new frontend links</li>
       <li>Updated Simkl support</li>
+      <li>Added PStream TV support</li>
       <li>Minor UI/UX improvements</li>
     </ul>
   `;
@@ -1429,7 +1430,17 @@
     return false;
   }
 
-  function rewritePlayerLinkHref(href, tmdbID, s, e) {
+  /** P-Stream TV URLs use TMDB season row id and episode row id: /media/tmdb-tv-{showId}/{seasonId}/{episodeId} (not S/E numbers). */
+  function extractPstreamTvIdsFromSeasonJson(sJson, episodeNum) {
+    const seasonId = sJson && Number.isFinite(Number(sJson.id)) ? Number(sJson.id) : null;
+    const eps = Array.isArray(sJson?.episodes) ? sJson.episodes : [];
+    const ep = eps.find(x => Number(x.episode_number) === Number(episodeNum));
+    const episodeId = ep && Number.isFinite(Number(ep.id)) ? Number(ep.id) : null;
+    if (seasonId == null || episodeId == null) return null;
+    return { seasonId, episodeId };
+  }
+
+  function rewritePlayerLinkHref(href, tmdbID, s, e, pstreamSeasonId = null, pstreamEpisodeId = null) {
     if (!href || href.includes('themoviedb.org')) return href;
     const id = String(tmdbID);
     let h = href.replace(/\?\?+/g, '?');
@@ -1438,6 +1449,17 @@
     if (u.protocol === 'stremio:') return href;
     const qs = u.searchParams;
     const sxe = `s${String(s).padStart(2, '0')}e${String(e).padStart(2, '0')}`;
+
+    if (/^pstream\.net$/i.test(u.hostname)) {
+      if (/^\/media\/tmdb-tv-/i.test(u.pathname)) {
+        if (pstreamSeasonId != null && pstreamEpisodeId != null) {
+          u.pathname = `/media/tmdb-tv-${id}/${pstreamSeasonId}/${pstreamEpisodeId}`;
+          return u.toString();
+        }
+        return href;
+      }
+      if (/^\/media\/tmdb-movie-/i.test(u.pathname)) return href;
+    }
 
     // Torrent sites that support season/episode filters
     if (/^ext\.to$/i.test(u.hostname)) {
@@ -1644,7 +1666,7 @@
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>
           <a href="https://111movies.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>
           <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>
-          <a href="https://vidrock.net/${vidType}/${tmdbID}/${query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>
+          <a href="https://vidrock.net/${vidType}/${tmdbID}${query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>
           <a href="https://vidlink.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidLink.pro${linkExternalTabArrow()}</a><br/>
         </div>` : ''}
 
@@ -1659,15 +1681,15 @@
           <strong>Watch on frontends:</strong><br/>
           <a href="https://www.cineby.sc/${vidType}/${tmdbID}${query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a>
           <a href="https://www.cineby.sc/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
+          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${vidType === 'tv' ? '1' : ''}">Watch on PStream${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>
+          <a href="https://xprime.su/watch/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>
           <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a>
           <a href="https://cinemaos.live/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
-          <a href="https://xprime.su/watch/${tmdbID}/${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(Might have 4K)</small><br/>
           <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>
           <a href="https://www.rivestream.app/watch?type=${vidType}&id=${tmdbID}${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on RiveStream${linkExternalTabArrow()}</a><br/>
           <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a>
           <a href="https://hexa.su/details/${vidType}/${tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
           <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>
-          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>Watch on PStream${linkExternalTabArrow()}</a> ${vidType === "tv" ? "(Auto Episode Not Available, Playback will start from first episode)" : "(4K possible)"}<br/>
         </div>` : ''}
 
         ${html}
@@ -1698,6 +1720,23 @@
 
     tmdb_id?.addEventListener('click', () => { GM_setClipboard(tmdbID, 'text'); showNotification('TMDB id copied to clipboard'); });
     imdb_id?.addEventListener('click', () => { if (imdb) { GM_setClipboard(imdb, 'text'); showNotification('IMDB id copied to clipboard'); } });
+
+    /* P-Stream TV uses TMDb season id + episode id in the path (not S/E indices). Resolve after mount. */
+    if (Type === 'tv' && SETTINGS.enableFrontendLinks) {
+      const pstreamA = detailsDiv.querySelector('a[data-tm-pstream-tv="1"]');
+      if (pstreamA) {
+        void (async () => {
+          try {
+            const apiK = getNextApiKey();
+            const sJson = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tmdbID}/season/${season_number}?api_key=${apiK}`);
+            const ids = extractPstreamTvIdsFromSeasonJson(sJson, episode_number);
+            if (!ids) return;
+            const cur = pstreamA.getAttribute('href') || '';
+            pstreamA.setAttribute('href', rewritePlayerLinkHref(cur, tmdbID, season_number, episode_number, ids.seasonId, ids.episodeId));
+          } catch { /* ignore */ }
+        })();
+      }
+    }
 
     /* Watch Trailer button */
     try {
@@ -1823,13 +1862,14 @@
                 const total = episodes || parseInt(seasonSelect.selectedOptions[0].dataset.episodes) || 0;
                 if (total > 0 && (epNum < 1 || epNum > total)) { showNotification(`Selected episode out of range (1-${total})`); updateLinksBtn.disabled = false; updateLinksBtn.textContent = 'Update player links'; return; }
                 const s = seasonNum, e = epNum;
+                const pstreamIds = extractPstreamTvIdsFromSeasonJson(sJson, epNum);
                 const anchors = Array.from(detailsDiv.querySelectorAll('a[href]'));
                 anchors.forEach(a => {
                   try {
                     let orig = a.dataset.originalHref;
                     if (!orig) { orig = a.getAttribute('href') || ''; a.dataset.originalHref = orig; }
                     if (!orig) return;
-                    a.setAttribute('href', rewritePlayerLinkHref(orig, tmdbID, s, e));
+                    a.setAttribute('href', rewritePlayerLinkHref(orig, tmdbID, s, e, pstreamIds?.seasonId ?? null, pstreamIds?.episodeId ?? null));
                   } catch (ex) { /* ignore */ }
                 });
                 // Update visible SxxExx labels that are rendered as link text (torrent shortcuts)

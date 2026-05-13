@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.8.1` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.8.2` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
