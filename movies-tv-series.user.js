@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.8.0
+// @version      1.8.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -174,6 +174,7 @@
     enableTransparencyMode: true,
     openLinksInNewTab: true,
     showSettingsButton: true,
+    disabledLinks: false, // keep it disabled otherwise older/expired links will be shown
 
     /* ---- Theme ---- */
     activeTheme: 'tmdb',            // 'tmdb' | 'imdb' | 'trakt' | 'traktv3' | 'custom'
@@ -202,12 +203,9 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added DuckDuckGo support</li>
-      <li>Added Simkl support</li>
-      <li>Improved IMDb page layout detection</li>
-      <li>Merged Trakt links for better compatibility</li>
-      <li>Added Trakt V3 theme</li>
-      <li>Added userscript menu to show/hide settings button</li>
+      <li>Updated Playback links</li>
+      <li>Added new frontend links</li>
+      <li>Updated Simkl support</li>
       <li>Minor UI/UX improvements</li>
     </ul>
   `;
@@ -1642,11 +1640,18 @@
           <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineSrc.st${linkExternalTabArrow()}</a> (Supports
           <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Direct Download</a>)<br/>
           <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" ${linkTargetAttr()} ${accentStyle()}>Watch on VidKing.net${linkExternalTabArrow()}</a><br/>
-          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>
+          <a href="https://vsembed.ru/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VsEmbed.ru${linkExternalTabArrow()}</a><br/>
           <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>
           <a href="https://111movies.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>
           <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>
-          <a href="https://player.smashy.stream/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on Smashy.stream${linkExternalTabArrow()}</a><br/>
+          <a href="https://vidrock.net/${vidType}/${tmdbID}/${query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>
+          <a href="https://vidlink.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidLink.pro${linkExternalTabArrow()}</a><br/>
+        </div>` : ''}
+
+        ${SETTINGS.disabledLinks ? `
+        <div style="margin-top:6px;">
+          <strong>Disabled Links:</strong><br/>
+          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>
         </div>` : ''}
 
         ${SETTINGS.enableFrontendLinks ? `
@@ -1656,7 +1661,9 @@
           <a href="https://www.cineby.sc/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
           <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a>
           <a href="https://cinemaos.live/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
+          <a href="https://xprime.su/watch/${tmdbID}/${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(Might have 4K)</small><br/>
           <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>
+          <a href="https://www.rivestream.app/watch?type=${vidType}&id=${tmdbID}${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on RiveStream${linkExternalTabArrow()}</a><br/>
           <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a>
           <a href="https://hexa.su/details/${vidType}/${tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
           <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>
@@ -1759,7 +1766,14 @@
           try {
             const apiKey = getNextApiKey();
             const tvJson = await tmdbApiGetJson(`https://api.themoviedb.org/3/tv/${tmdbID}?api_key=${apiKey}`);
-            const seasons = Array.isArray(tvJson.seasons) ? tvJson.seasons.filter(s => typeof s.season_number === 'number' && s.season_number > 0) : [];
+            const seasons = Array.isArray(tvJson.seasons)
+              ? tvJson.seasons.filter(s =>
+                typeof s.season_number === 'number'
+                && s.season_number > 0
+                && Number.isFinite(Number(s.episode_count))
+                && Number(s.episode_count) > 0
+              )
+              : [];
             if (seasons.length === 0) { showNotification('No season data available'); playAnotherBtn.disabled = false; playAnotherBtn.textContent = 'Play another episode'; return; }
 
             controlsAreaEl = document.createElement('span');
@@ -2686,6 +2700,46 @@
     return { segment: m[1], simklId: m[2], mediaType: m[1] === 'movies' ? 'movie' : 'tv' };
   }
 
+  /** Simkl shows JOIN SIMKL / `.openReg` in the header when the session is not logged in. */
+  function isSimklGuestJoinCtaVisible() {
+    const el = document.querySelector('.SimklHeaderMenuJoinButton.openReg');
+    return !!(el && el.isConnected);
+  }
+
+  /**
+   * Only the logged-in "Your next episode to watch" block (table.next-episode-to-watch + heading).
+   * Logged-out pages show "Previously Aired Episode" with the same link shape — ignore that.
+   */
+  function extractSimklNextEpisodeToWatch() {
+    if (isSimklGuestJoinCtaVisible()) return null;
+    for (const table of document.querySelectorAll('table.next-episode-to-watch')) {
+      const which = table.querySelector('td.SimklTVAboutBlockEpisodeWhich');
+      const label = (which?.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!/your\s+next\s+episode\s+to\s+watch/i.test(label)) continue;
+      if (/previously\s+aired/i.test(label)) continue;
+      for (const a of table.querySelectorAll('a[href]')) {
+        const href = (a.getAttribute('href') || a.href || '').trim();
+        const m = href.match(/\/season-(\d+)\/episode-(\d+)(?:\/|[?#]|$)/i);
+        if (m) {
+          const season = parseInt(m[1], 10);
+          const episode = parseInt(m[2], 10);
+          if (season > 0 && episode > 0) return { season, episode };
+        }
+      }
+      const epSpan = table.querySelector('span.episode');
+      if (epSpan) {
+        const t = (epSpan.textContent || '').replace(/\s+/g, ' ').trim();
+        const m = t.match(/season\s*(\d+)\s*:\s*episode\s*(\d+)/i) || t.match(/\bs\s*(\d+)\s*e\s*(\d+)\b/i);
+        if (m) {
+          const season = parseInt(m[1], 10);
+          const episode = parseInt(m[2], 10);
+          if (season > 0 && episode > 0) return { season, episode };
+        }
+      }
+    }
+    return null;
+  }
+
   /** SPA / quick-switch: URL can lag behind DOM — bind identity includes visible title + external ids. */
   function simklContentFingerprint() {
     const path = parseSimklPathKind();
@@ -2709,7 +2763,9 @@
       const mm = h.match(/myanimelist\.net\/anime\/(\d+)/i);
       if (mm) mal = mm[1];
     }
-    return `${slugId}|${h1}|${imdb}|${mal}`;
+    const nextEp = extractSimklNextEpisodeToWatch();
+    const nextKey = nextEp ? `s${nextEp.season}e${nextEp.episode}` : '';
+    return `${slugId}|${h1}|${imdb}|${mal}|${nextKey}`;
   }
 
   function simklBindKey() {
@@ -2779,7 +2835,13 @@
     }
 
     const resolvedType = tmdb && scrapedType ? scrapedType : path.mediaType;
-    return { imdb, tmdb, type: resolvedType, season: null, episode: null, mal };
+    let season = null;
+    let episode = null;
+    if (resolvedType === 'tv' && path.mediaType === 'tv') {
+      const next = extractSimklNextEpisodeToWatch();
+      if (next) { season = next.season; episode = next.episode; }
+    }
+    return { imdb, tmdb, type: resolvedType, season, episode, mal };
   }
 
   function installSimklGlobalKeydownOnce() {

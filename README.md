@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.8.0` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.8.1` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
@@ -51,6 +51,7 @@ For **TV shows** specifically, you also get episode controls — pick any season
 > You can add multiple API keys (comma-separated) in the settings panel under the **TMDb API keys** section. The script rotates between them automatically, which helps avoid hitting TMDb's rate limits.
 
 The script includes `@updateURL` and `@downloadURL` headers pointing to this repo, so Tampermonkey can check for and apply updates automatically.
+
 ---
 
 ## Settings
@@ -67,7 +68,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 
 | Setting | What it does |
 |---|---|
-| Auto-detect Movies/TV | Automatically shows the card when a media search is detected |
+| Auto-detect Movies/TV | Automatically shows the card when a media search is detected (each site can be toggled seperately too) |
 | Google / Bing / Brave / DuckDuckGo / IMDb / Trakt / Simkl / YTS support | Turn the script on or off per supported site |
 | Streaming links | The main list of watch links |
 | Frontend links | Cineby, CinemaOS, ShuttleTV, Hexa, etc. |
@@ -77,6 +78,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | "Open in Stremio" link | Deep link to open in your Stremio app |
 | Trakt link | Adds a direct app.trakt.tv link under the IMDb ID |
 | Trakt search results link | Adds a Trakt search link as a separate toggle from the direct link |
+| Simkl link | Adds an optional Simkl search shortcut next to the TMDb ID in the card |
 | Allow changing episode number | Shows season/episode selectors for TV shows |
 | Watch trailer button | Plays the official trailer in an in-page popup |
 | Autoplay trailer | Auto-starts the trailer when opened (mind your volume) |
@@ -95,7 +97,7 @@ Most settings apply **instantly** (the current info card re-renders on save), so
 | Shortcut | Action |
 |---|---|
 | `Shift+R` | Open/close settings panel |
-| `Shift+P` | Toggle the streaming links overlay on **IMDb**, **Trakt**, **YTS** and **Simkl** title pages (where enabled) |
+| `Shift+P` | Toggle the streaming links overlay on **IMDb**, **Trakt**, **YTS**, and **Simkl** title pages (where that site’s support is enabled) |
 
 ---
 
@@ -142,6 +144,9 @@ For a fuller statement on liability, third-party sites, and user responsibility 
 **Play button not showing on IMDb**
 → IMDb sometimes changes their page layout. Try pressing **Shift+P** as a fallback — it triggers the overlay directly.
   > If that happens, please open an issue in the repo or talk to me directly at [discord](https://discord.gg/sTVCTf8Qtd)
+
+**Script does nothing on `themoviedb.org`**
+→ Support is not yet available at this time. Future versions might include TMDB. 
 
 ---
 
