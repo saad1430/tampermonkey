@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.0
+// @version      1.9.1
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -50,8 +50,6 @@
     'FMHY': 'https://fmhy.net',
     'Star the repo ⭐': 'https://github.com/saad1430/tampermonkey',
   };
-
-  const AnnouncementMessage = []
 
   /* ----------------------------------------------------
    * Theme System
