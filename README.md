@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.8.2` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.9.0` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
@@ -18,6 +18,7 @@ On **Google**, **Bing**, **Brave**, and **DuckDuckGo**, the script can automatic
 - **Trakt links** — jump straight to the title on [Trakt](https://app.trakt.tv)
 - **Watch Trailer** — plays the official YouTube trailer in a popup
 - **Content rating** — fetches the certification (e.g. PG-13, TV-MA)
+- **Compact display modes** — pick how much of the card you want to see at once: **Featured** (the curated short list), **Custom** (your own pick), **Tabbed** (links grouped into tabs), or **Full** (everything). Switch on the fly from the small icon group in the card's top-right.
 
 For **TV shows** specifically, you also get episode controls — pick any season and episode and all the player links update automatically.
 
@@ -64,10 +65,32 @@ If the FAB is hidden, use **Tampermonkey → Movie/TV Shows Links Aggregator →
 
 Most settings apply **instantly** (the current info card re-renders on save), so you usually don’t need to refresh the page.
 
+### Display modes
+
+At the top of the settings panel, the **Display modes** group lets you choose how the card surfaces and how compact it should be.
+
+- **Search engine display mode** — `Inline` (default) embeds the card directly in the search results, or `Overlay` injects a `▶ Watch Now` button at the same spot and only opens the card in a modal when you click it (handy if you don't want the card pushing results down).
+- **Search layout** — only shown when the display mode is `Inline`. Controls how compact the inline card is: `Featured`, `Custom`, `Tabbed`, or `Full`. Defaults to `Featured`.
+- **Overlay layout** — controls the layout used inside the `.tmdb-overlay` modal (opened from IMDb / Trakt / Simkl / YTS, or from `Watch Now` on SERP). Defaults to `Full`.
+- **Customize Custom layout…** — only appears when at least one of the two layouts is set to `Custom`. Opens a picker where you check exactly which links belong in your Custom list, grouped by category, with `Select all` / `Clear` per group and `Reset to Featured` in the footer.
+
+The four layouts:
+
+| Layout | What it shows |
+|---|---|
+| Featured | The curated short list (author-flagged best links). Includes a `Show all links ↓` button that temporarily expands to Full without changing your setting. |
+| Custom | Your hand-picked list. Lazily seeded from Featured the first time you use it, so it starts useful and you tweak from there. Includes an `Edit picks ✎` button that opens the picker. |
+| Tabbed | All links grouped into `Stream` / `Frontend` / `Torrents` / `Sites` tabs. The active tab is remembered between renders. |
+| Full | Every link with its section header — the classic layout. |
+
+You can also switch layouts directly from the card itself: a tiny four-button group (`⚡` Featured, `★` Custom, `☰` Tabbed, `≣` Full) lives at the top-right of the card and works both inline and inside the modal.
+
 ### Available toggles
 
 | Setting | What it does |
 |---|---|
+| Search engine display mode / Search layout / Overlay layout | Pick `Inline` vs `Overlay` for SERP and the layout used in each (see **Display modes** above) |
+| Customize Custom layout… | Opens the picker so you can choose exactly which links appear in `Custom` mode |
 | Auto-detect Movies/TV | Automatically shows the card when a media search is detected (each site can be toggled seperately too) |
 | Google / Bing / Brave / DuckDuckGo / IMDb / Trakt / Simkl / YTS support | Turn the script on or off per supported site |
 | Streaming links | The main list of watch links |

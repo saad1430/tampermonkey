@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.8.2
+// @version      1.9.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -50,6 +50,8 @@
     'FMHY': 'https://fmhy.net',
     'Star the repo ⭐': 'https://github.com/saad1430/tampermonkey',
   };
+
+  const AnnouncementMessage = []
 
   /* ----------------------------------------------------
    * Theme System
@@ -162,9 +164,9 @@
     enableFrontendLinks: true,
     enableTorrentSiteShortcuts: true,
     enableYtsTorrents: true,
-    enableStremioLink: true,
+    enableStremioLink: false,
     enableTraktLink: true,
-    enableTraktSearchLink: true,
+    enableTraktSearchLink: false,
     enableSimklLink: true,
     enableEpisodeSelection: true,
     enableTrailerButton: true,
@@ -175,6 +177,14 @@
     openLinksInNewTab: true,
     showSettingsButton: true,
     disabledLinks: false, // keep it disabled otherwise older/expired links will be shown
+
+    /* ---- Compact display modes ---- */
+    serpDisplayMode: 'inline',       // 'inline' | 'overlay' — how the card surfaces on search engines
+    serpInlineSubmode: 'featured',   // 'featured' | 'custom' | 'tabbed' | 'full' — only used when serpDisplayMode='inline'
+    overlayLayout: 'full',           // layout used inside the overlay modal (IMDb/Trakt/Simkl/YTS/SERP-overlay); forward-looking knob
+    customLinkIds: null,             // null = lazily seeded from Featured on first read
+    lastInfoCardTab: 'stream',       // 'stream' | 'frontend' | 'torrents' | 'sites'
+    knownLinkIds: [],                // diffed against registry on load to detect new author links
 
     /* ---- Theme ---- */
     activeTheme: 'tmdb',            // 'tmdb' | 'imdb' | 'trakt' | 'traktv3' | 'custom'
@@ -195,6 +205,229 @@
   ];
 
   /* ----------------------------------------------------
+   * Link Registry
+   * Source of truth for every link rendered in the info card's main link blocks.
+   * `featured: true` flags the curated subset (author-controlled, updates with the script).
+   * Anything bespoke (TMDb/IMDb IDs row, Stremio, Trailer button, Change-result,
+   * YTS magnets table) lives in the universal header and is NOT part of this registry.
+   * Each entry's renderHtml(ctx) returns the row HTML (incl. trailing <br/>).
+   * `appliesTo` defaults to ['movie','tv']. `gate` is a SETTINGS boolean flag that
+   * acts as a kill switch (existing per-category toggles still work).
+   * -------------------------------------------------- */
+  const LINK_CATEGORIES = [
+    { id: 'stream',   label: 'Streaming',     heading: 'Streaming links:' },
+    { id: 'frontend', label: 'Frontends',     heading: 'Watch on frontends:' },
+    { id: 'torrents', label: 'Torrents',      heading: 'Torrents:' },
+    { id: 'sites',    label: 'Torrent Sites', heading: 'Search on Torrent Sites:' },
+  ];
+
+  const LINKS = [
+    /* ---- Streaming (single anchor per row) ---- */
+    {
+      id: 'videasy', category: 'stream', label: 'VidEasy.net (recommended)', featured: true,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://player.videasy.net/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.net (recommended)${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'cinemaos-tech', category: 'stream', label: 'CinemaOS.tech (fastest)', featured: true,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://cinemaos.tech/player/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS.tech (fastest)${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'cinesrc', category: 'stream', label: 'CineSrc.st (with Direct Download)', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://cinesrc.st/embed/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineSrc.st${linkExternalTabArrow()}</a> (Supports <a href="https://cinesrc.st/download/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Direct Download</a>)<br/>`,
+    },
+    {
+      id: 'vidking', category: 'stream', label: 'VidKing.net', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://www.vidking.net/embed/${c.vidType}/${c.tmdbID}${c.query}?color=e50914" ${linkTargetAttr()} ${accentStyle()}>Watch on VidKing.net${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vsembed', category: 'stream', label: 'VsEmbed.ru', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vsembed.ru/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VsEmbed.ru${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'multiembed', category: 'stream', label: 'MultiEmbed.mov', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://multiembed.mov/?video_id=${c.tmdbID}&tmdb=1${c.multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: '111movies', category: 'stream', label: '111Movies.net', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://111movies.net/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidfast', category: 'stream', label: 'VidFast.pro', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vidfast.pro/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidrock', category: 'stream', label: 'VidRock.net', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vidrock.net/${c.vidType}/${c.tmdbID}${c.query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidlink', category: 'stream', label: 'VidLink.pro', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vidlink.pro/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidLink.pro${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidsrc', category: 'stream', label: 'VidSrc.to (legacy / often broken)', featured: false,
+      gate: 'disabledLinks',
+      renderHtml: (c) => `<a href="https://vidsrc.to/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>`,
+    },
+
+    /* ---- Frontends ---- */
+    {
+      id: 'cineby', category: 'frontend', label: 'Cineby (+ More Info)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://www.cineby.sc/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a> <a href="https://www.cineby.sc/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: 'pstream', category: 'frontend', label: 'PStream (4K possible)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://pstream.net/media/tmdb-${c.vidType}-${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${c.vidType === 'tv' ? '1' : ''}">Watch on PStream${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>`,
+    },
+    {
+      id: 'xprime', category: 'frontend', label: 'XPrime (4K possible)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://xprime.su/watch/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>`,
+    },
+    {
+      id: 'cinemaos-live', category: 'frontend', label: 'CinemaOS (+ More Info)', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://cinemaos.live/${c.vidType}/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a> <a href="https://cinemaos.live/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: 'shuttletv', category: 'frontend', label: 'ShuttleTV', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://shuttletv.su/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'rivestream', category: 'frontend', label: 'RiveStream', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://www.rivestream.app/watch?type=${c.vidType}&id=${c.tmdbID}${c.multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on RiveStream${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'hexa', category: 'frontend', label: 'Hexa (+ More Info)', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://hexa.su/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a> <a href="https://hexa.su/details/${c.vidType}/${c.tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: '67movies', category: 'frontend', label: '67Movies', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://67movies.net/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>`,
+    },
+
+    /* ---- Torrent Sites ---- */
+    {
+      id: '1337x', category: 'sites', label: '1337x.to (+ Mirrors)', featured: true,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://1337x.to/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>1337x.to${linkExternalTabArrow()}</a> - <a href="https://1337x.st/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://x1337x.cc/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'eztv', category: 'sites', label: 'EZTVx.to (TV only, + Mirrors)', featured: false,
+      appliesTo: ['tv'], gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => c.imdb
+        ? `<a href="https://eztvx.to/search/${c.imdb}" ${linkTargetAttr()} ${accentStyle()}>EZTVx.to${linkExternalTabArrow()}</a> - <a href="https://eztv1.xyz/search/${c.imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://eztv.yt/search/${c.imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`
+        : '',
+    },
+    {
+      id: 'limetorrents', category: 'sites', label: 'LimeTorrents.fun', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://www.limetorrents.fun/search/${c.vidType1337}/${c.title}" ${linkTargetAttr()} ${accentStyle()}>LimeTorrents.fun${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'knaben', category: 'sites', label: 'Knaben.org (with SxE for TV)', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://knaben.org/search/${encodeURIComponent(c.title)}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>Knaben.org${linkExternalTabArrow()}</a>${c.Type === 'tv' ? ` - <a data-tm-sxe-link="1" href="https://knaben.org/search/${encodeURIComponent(`${c.title} ${c.sxe}`)}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>${c.sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>`,
+    },
+    {
+      id: 'extto', category: 'sites', label: 'Ext.to (with SxE for TV)', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://ext.to/browse/?with_adult=1&cat=${c.extCategory}${c.imdb ? `&imdb_id=${c.imdb}` : `&name_filter=${encodeURIComponent(c.title)}`}" ${linkTargetAttr()} ${accentStyle()}>Ext.to${linkExternalTabArrow()}</a>${c.Type === 'tv' ? ` - <a data-tm-sxe-link="1" href="https://ext.to/browse/?with_adult=1&cat=${c.extCategory}${c.imdb ? `&imdb_id=${c.imdb}&name_filter=${c.sxe}` : `&name_filter=${encodeURIComponent(`${c.title} ${c.sxe}`)}`}" ${linkTargetAttr()} ${accentStyle()}>${c.sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>`,
+    },
+    {
+      id: 'tpb', category: 'sites', label: 'ThePirateBay.org', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://thepiratebay.org/search.php?q=${c.title}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} ${accentStyle()}>ThePirateBay.org${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'extratorrent', category: 'sites', label: 'ExtraTorrent.st', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://extratorrent.st/search/?new=1&search=${c.title}&s_cat=${c.ET_cat}" ${linkTargetAttr()} ${accentStyle()}>ExtraTorrent.st${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'rutor', category: 'sites', label: 'Rutor.is', featured: false,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => `<a href="https://rutor.is/search/${c.title}" ${linkTargetAttr()} ${accentStyle()}>Rutor.is${linkExternalTabArrow()}</a><br/>`,
+    },
+  ];
+
+  /** Featured ids in registry order. */
+  function getFeaturedLinkIds() {
+    return LINKS.filter(e => e.featured).map(e => e.id);
+  }
+
+  /** All registry ids in registry order. */
+  function getAllLinkIds() {
+    return LINKS.map(e => e.id);
+  }
+
+  /**
+   * Returns the user's Custom selection, lazily seeded from Featured when null.
+   * NOTE: this does not write back — callers that want to persist the seed must do so explicitly.
+   */
+  function getCustomLinkIds() {
+    if (Array.isArray(SETTINGS.customLinkIds)) return SETTINGS.customLinkIds;
+    return getFeaturedLinkIds();
+  }
+
+  /** Type-aware visibility: appliesTo + gate. */
+  function linkEntryApplies(entry, Type) {
+    const types = Array.isArray(entry.appliesTo) ? entry.appliesTo : ['movie', 'tv'];
+    if (!types.includes(Type)) return false;
+    if (entry.gate && SETTINGS[entry.gate] === false) return false;
+    return true;
+  }
+
+  /* ----------------------------------------------------
+   * Active surface resolver
+   * `serp` — search engines (Google/Bing/Brave/DDG): user picks Inline or Overlay.
+   * `overlay` — IMDb / Trakt / Simkl / YTS / SERP-overlay: always renders inside .tmdb-overlay.
+   *   The overlayLayout setting is forward-looking; the modal always renders Full for now.
+   * -------------------------------------------------- */
+  function getActiveSurfaceConfig() {
+    if (typeof isSearch === 'function' && isSearch()) {
+      return {
+        surface: 'serp',
+        displayMode: SETTINGS.serpDisplayMode || 'inline',
+        inlineSubmode: SETTINGS.serpInlineSubmode || 'featured',
+      };
+    }
+    return {
+      surface: 'overlay',
+      displayMode: 'overlay',
+      inlineSubmode: SETTINGS.overlayLayout || 'full',
+    };
+  }
+
+  /**
+   * Returns the SETTINGS key driving the active submode for the current card context.
+   * If the card lives inside the .tmdb-overlay modal it's 'overlayLayout' regardless
+   * of surface (SERP-overlay, IMDb, Trakt, Simkl, YTS); otherwise the SERP inline key.
+   */
+  function getActiveSubmodeSettingKey() {
+    const card = document.querySelector('.tmdb-info-card');
+    if (card && card.closest('.tmdb-overlay-inner')) return 'overlayLayout';
+    const cfg = getActiveSurfaceConfig();
+    if (cfg.surface === 'serp') return 'serpInlineSubmode';
+    return 'overlayLayout';
+  }
+
+  /* ----------------------------------------------------
   * Announcements (What's New)
   * -------------------------------------------------- */
 
@@ -202,12 +435,9 @@
   const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
+    <h4 style="color: #11dd11;">Extension took a lot of space in your browser? SAY NO MORE! Now you can control the display of the card from settings panel</h4>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Updated Playback links</li>
-      <li>Added new frontend links</li>
-      <li>Updated Simkl support</li>
-      <li>Added PStream TV support</li>
-      <li>Minor UI/UX improvements</li>
+      <li>UI optimizations and improvements</li>
     </ul>
   `;
 
@@ -244,13 +474,36 @@
   function saveSettings(s) { GM_setValue('tmdb_settings', JSON.stringify(s)); }
 
   let SETTINGS = loadSettings();
-  let lastInfoCardRender = null; // { data, torrents, imdb, season, episode, ytsLanguage }
+  let lastInfoCardRender = null; // { data, torrents, imdb, season, episode, ytsLanguage, peekSubmode }
   let lastChangeResultCandidates = null; // array of TMDb search results for "Change result" dropdown
 
   /* Apply theme immediately on load */
   applyTheme(SETTINGS.activeTheme || 'tmdb');
 
   maybeShowAnnouncement();
+
+  /**
+   * Detect new author-added links across script updates.
+   * Only nudges users actually using Custom mode (customLinkIds !== null).
+   * Always refreshes knownLinkIds afterwards so the hint doesn't repeat.
+   */
+  function maybeShowNewLinksHint() {
+    const currentIds = getAllLinkIds();
+    const known = Array.isArray(SETTINGS.knownLinkIds) ? SETTINGS.knownLinkIds : [];
+    const newIds = currentIds.filter(id => !known.includes(id));
+    /* Persist the snapshot regardless. */
+    if (newIds.length || known.length !== currentIds.length) {
+      SETTINGS = { ...SETTINGS, knownLinkIds: currentIds };
+      saveSettings(SETTINGS);
+    }
+    /* On a clean install (no previous snapshot), don't pop a hint — that's just initial seeding. */
+    if (!known.length) return;
+    /* Only nudge users on Custom mode (or who have customised). */
+    const usesCustom = Array.isArray(SETTINGS.customLinkIds)
+      && (SETTINGS.serpInlineSubmode === 'custom' || SETTINGS.overlayLayout === 'custom');
+    if (!newIds.length || !usesCustom) return;
+    showNotification(`${newIds.length} new link${newIds.length === 1 ? '' : 's'} available — open Customize to add ${newIds.length === 1 ? 'it' : 'them'}.`, 7000);
+  }
 
   function linkTargetAttr() {
     return SETTINGS.openLinksInNewTab ? 'target="_blank" rel="noopener"' : '';
@@ -263,6 +516,10 @@
   function rerenderInfoCardIfPresent() {
     const existing = document.querySelector('.tmdb-info-card');
     if (!existing || !lastInfoCardRender) return;
+    /* If the existing card lives inside the .tmdb-overlay modal, remember its host so
+       we can re-attach the freshly rendered card there (renderInfoBox always prepends
+       to getMountTarget() first). */
+    const overlayInner = existing.closest('.tmdb-overlay-inner');
     try { existing.remove(); } catch (e) { /* ignore */ }
     try {
       renderInfoBox(
@@ -275,6 +532,12 @@
         lastInfoCardRender.episodeDisplayName
       );
     } catch (e) { /* ignore */ }
+    if (overlayInner && overlayInner.isConnected) {
+      try {
+        const fresh = document.querySelector('.tmdb-info-card');
+        if (fresh && fresh.parentElement !== overlayInner) overlayInner.appendChild(fresh);
+      } catch (e) { /* ignore */ }
+    }
     try { ensureChangeResultButton(); } catch (e) { /* ignore */ }
   }
 
@@ -647,6 +910,237 @@
     @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
     /* Trakt summary play: no layout overrides — classes + data-* mirror native .trakt-action-button */
+
+    /* ---- Compact mode: on-card submode toggle ---- */
+    .tmdb-info-card .tmdb-card-toolbar {
+      position: absolute; right: 8px; top: 8px;
+      display: flex; gap: 4px;
+      background: rgba(var(--tm-bg) / 0.45);
+      border: 1px solid rgba(var(--tm-border) / 0.4);
+      border-radius: 999px;
+      padding: 2px;
+      backdrop-filter: blur(6px);
+      z-index: 2;
+    }
+    .tmdb-info-card .tmdb-mode-btn {
+      cursor: pointer;
+      background: transparent;
+      color: rgb(var(--tm-text));
+      border: none;
+      border-radius: 999px;
+      width: 26px; height: 26px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 600;
+      opacity: 0.75;
+      transition: background .15s ease, opacity .15s ease, color .15s ease;
+      user-select: none;
+    }
+    .tmdb-info-card .tmdb-mode-btn:hover { opacity: 1; background: rgba(var(--tm-accent) / 0.2); }
+    .tmdb-info-card .tmdb-mode-btn.active {
+      background: rgb(var(--tm-accent));
+      color: rgb(var(--tm-bg));
+      opacity: 1;
+    }
+    .tmdb-info-card .tmdb-title { padding-right: 140px; }
+
+    /* ---- Compact mode: tabbed strip ---- */
+    .tmdb-info-card .tmdb-tabs {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin: 8px 0 6px 0;
+      border-bottom: 1px solid rgba(var(--tm-border) / 0.4);
+      padding-bottom: 4px;
+    }
+    .tmdb-info-card .tmdb-tab {
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      color: rgb(var(--tm-text));
+      padding: 4px 10px;
+      border-radius: 6px 6px 0 0;
+      font-weight: 600;
+      font-size: 13px;
+      opacity: 0.75;
+    }
+    .tmdb-info-card .tmdb-tab:hover { opacity: 1; background: rgba(var(--tm-accent) / 0.15); }
+    .tmdb-info-card .tmdb-tab.active {
+      background: rgba(var(--tm-accent) / 0.18);
+      color: rgb(var(--tm-accent));
+      border-color: rgba(var(--tm-border) / 0.5);
+      border-bottom-color: transparent;
+      opacity: 1;
+    }
+    .tmdb-info-card .tmdb-tab-pane { min-height: 1em; }
+
+    /* ---- Featured peek toggle / Custom edit-picks ---- */
+    .tmdb-info-card .tmdb-card-footer-link {
+      display: inline-block;
+      margin-top: 8px;
+      cursor: pointer;
+      background: transparent;
+      border: 1px dashed rgba(var(--tm-border) / 0.6);
+      color: rgb(var(--tm-accent));
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tmdb-info-card .tmdb-card-footer-link:hover { background: rgba(var(--tm-accent) / 0.12); }
+    .tmdb-info-card .tmdb-empty-state {
+      margin-top: 8px; padding: 10px 12px;
+      background: rgba(var(--tm-surface) / 0.4);
+      border: 1px dashed rgba(var(--tm-border) / 0.4);
+      border-radius: 8px;
+      font-size: 13px; opacity: 0.85;
+    }
+
+    /* ---- Settings panel: display group ---- */
+    .tmdb-settings .tmdb-display-group {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      padding: 10px;
+      background: rgba(var(--tm-surface) / 0.45);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+    }
+    .tmdb-settings .tmdb-display-group h3 {
+      grid-column: 1 / -1;
+      margin: 0 0 2px 0; font-size: 14px;
+      color: rgb(var(--tm-accent));
+    }
+    .tmdb-settings .tmdb-display-field {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 6px 8px;
+      background: rgba(var(--tm-bg) / 0.35);
+      border-radius: 6px;
+    }
+    .tmdb-settings .tmdb-display-field > .tmdb-field-label {
+      font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .tmdb-settings .tmdb-radio-row {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .tmdb-settings .tmdb-radio-row label {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 8px;
+      background: rgba(var(--tm-surface) / 0.55);
+      border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; user-select: none;
+      border: 1px solid rgba(255,255,255,.05);
+    }
+    .tmdb-settings .tmdb-radio-row label.active {
+      background: rgb(var(--tm-accent));
+      color: rgb(var(--tm-bg));
+      border-color: rgb(var(--tm-accent));
+    }
+    .tmdb-settings .tmdb-radio-row input[type="radio"] { margin: 0; }
+
+    /* ---- Customize picker modal ---- */
+    .tmdb-picker-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 9999999;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tmdb-picker {
+      width: clamp(50vw, 92vw, 720px);
+      max-height: 88vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgb(var(--tm-border));
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .tmdb-picker header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(var(--tm-border) / 0.35);
+    }
+    .tmdb-picker header h2 { margin: 0; font-size: 17px; }
+    .tmdb-picker .picker-body {
+      flex: 1 1 auto; min-height: 0;
+      overflow-y: auto;
+      padding: 12px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(var(--tm-accent) / 0.55) rgba(var(--tm-bg) / 0.4);
+    }
+    .tmdb-picker .picker-body::-webkit-scrollbar { width: 10px; }
+    .tmdb-picker .picker-body::-webkit-scrollbar-thumb {
+      background: rgba(var(--tm-accent) / 0.45);
+      border-radius: 999px;
+      border: 2px solid transparent; background-clip: padding-box;
+    }
+    .tmdb-picker .picker-help {
+      font-size: 12px; opacity: 0.78; margin: 0 0 8px 0; line-height: 1.45;
+    }
+    .tmdb-picker .picker-group {
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+      background: rgba(var(--tm-surface) / 0.35);
+    }
+    .tmdb-picker .picker-group-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(var(--tm-bg) / 0.35);
+      border-radius: 8px 8px 0 0;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .tmdb-picker .picker-group-head h3 { margin: 0; font-size: 13px; color: rgb(var(--tm-accent)); }
+    .tmdb-picker .picker-group-head .picker-group-actions { display: flex; gap: 4px; }
+    .tmdb-picker .picker-mini-btn {
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid rgba(var(--tm-border) / 0.5);
+      color: rgb(var(--tm-text));
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px; font-weight: 600;
+    }
+    .tmdb-picker .picker-mini-btn:hover { background: rgba(var(--tm-accent) / 0.15); }
+    .tmdb-picker .picker-rows {
+      display: grid; gap: 4px;
+      padding: 8px 12px;
+    }
+    .tmdb-picker .picker-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .tmdb-picker .picker-row:hover { background: rgba(var(--tm-accent) / 0.08); }
+    .tmdb-picker .picker-row input[type="checkbox"] { flex-shrink: 0; }
+    .tmdb-picker .picker-row .picker-star {
+      font-size: 11px;
+      color: rgb(var(--tm-accent));
+      background: rgba(var(--tm-accent) / 0.18);
+      padding: 1px 6px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .tmdb-picker .picker-row .picker-label { flex: 1; min-width: 0; }
+    .tmdb-picker footer {
+      display: flex; gap: 8px; justify-content: flex-end;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(var(--tm-border) / 0.35);
+    }
+    .tmdb-picker footer .picker-spacer { flex: 1; }
+
+    /* ---- SERP Overlay-mode Watch Now button ---- */
+    #tmdb-serp-overlay-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin: 10px 0; padding: 10px 16px;
+      background: rgb(var(--tm-accent)); color: rgb(var(--tm-bg));
+      border: none; border-radius: 8px;
+      font-weight: bold; font-size: 15px; cursor: pointer;
+      user-select: none;
+    }
+    #tmdb-serp-overlay-btn:hover { filter: brightness(1.08); }
   `);
 
   /* ----------------------------------------------------
@@ -1083,6 +1577,9 @@
    * -------------------------------------------------- */
   function openSettingsPanel() {
     if (document.querySelector('.tmdb-settings-overlay')) { closeSettingsPanel(); return; }
+    /* Never stack on top of an existing info-card overlay or picker (e.g. Shift+R while a
+       Shift+P overlay is open). Close them first so only one modal is visible at a time. */
+    closeOtherTopLevelOverlays('.tmdb-settings-overlay');
 
     const keysStr = JSON.parse(GM_getValue('tmdb_api_keys') || '[]').join(', ');
     const curTheme = SETTINGS.activeTheme || 'tmdb';
@@ -1125,6 +1622,21 @@
             ${customColorFields}
             <div class="tmdb-custom-theme-reset">
               <button type="button" class="tmdb-btn ghost" id="tmdb-reset-custom-theme">Reset custom colors to default</button>
+            </div>
+          </div>
+
+          <!-- Display modes -->
+          <div class="tmdb-display-group">
+            <h3>Display modes</h3>
+            ${displayRadios('serpDisplayMode', 'Search engine display mode', ['inline','overlay'], SETTINGS.serpDisplayMode)}
+            ${displayRadios('serpInlineSubmode', 'Search layout', ['featured','custom','tabbed','full'], SETTINGS.serpInlineSubmode, { id: 'tmdb-row-search-layout' })}
+            ${displayRadios('overlayLayout', 'Overlay layout', ['featured','custom','tabbed','full'], SETTINGS.overlayLayout)}
+            <div class="tmdb-display-field" id="tmdb-row-customize" style="grid-column:1 / -1;">
+              <span class="tmdb-field-label">Custom layout</span>
+              <div>
+                <button type="button" class="tmdb-btn ghost" id="tmdb-open-customize">Customize Custom layout…</button>
+                <span style="margin-left:8px;font-size:11px;opacity:0.7;">Pick which links appear when Custom is the active layout</span>
+              </div>
             </div>
           </div>
 
@@ -1225,6 +1737,48 @@
 
     document.getElementById('tmdb-close').onclick = closeSettingsPanel;
 
+    /* Display-mode radios: keep active class visually in sync as the user clicks. */
+    overlay.querySelectorAll('.tmdb-display-field[data-tm-radio-key] input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const group = radio.closest('.tmdb-display-field');
+        if (!group) return;
+        group.querySelectorAll('label').forEach(lbl => {
+          const inner = lbl.querySelector('input[type="radio"]');
+          lbl.classList.toggle('active', !!inner?.checked);
+        });
+        refreshDisplayConditionals();
+      });
+    });
+
+    /* Dynamic visibility for the Display group:
+       - "Search layout" only shown when "Search engine display mode" is 'inline'
+       - "Customize Custom layout…" only shown when at least one layout radio is 'custom'
+         (and that layout's row is actually visible — i.e. Search layout in Overlay mode doesn't count) */
+    function getActiveLayoutValue(name) {
+      const r = overlay.querySelector(`input[type="radio"][name="${name}"]:checked`);
+      return r ? r.value : null;
+    }
+    function refreshDisplayConditionals() {
+      const serpDisplay = getActiveLayoutValue('serpDisplayMode');
+      const searchLayoutRow = overlay.querySelector('#tmdb-row-search-layout');
+      const searchLayoutVisible = serpDisplay !== 'overlay';
+      if (searchLayoutRow) searchLayoutRow.style.display = searchLayoutVisible ? '' : 'none';
+
+      const serpLayout = getActiveLayoutValue('serpInlineSubmode');
+      const overlayLayoutVal = getActiveLayoutValue('overlayLayout');
+      const customNeeded =
+        (searchLayoutVisible && serpLayout === 'custom')
+        || overlayLayoutVal === 'custom';
+      const customizeRow = overlay.querySelector('#tmdb-row-customize');
+      if (customizeRow) customizeRow.style.display = customNeeded ? '' : 'none';
+    }
+    refreshDisplayConditionals();
+
+    /* Open Customize picker from the settings panel */
+    overlay.querySelector('#tmdb-open-customize')?.addEventListener('click', () => {
+      openCustomizePicker({ fromSettings: true });
+    });
+
     document.getElementById('tmdb-save').onclick = () => {
       const next = { ...SETTINGS };
 
@@ -1232,6 +1786,13 @@
       Object.keys(DEFAULT_SETTINGS).forEach(k => {
         const el = overlay.querySelector(`#cb-${k}`);
         if (el) next[k] = !!el.checked;
+      });
+
+      /* Display-mode radios */
+      const RADIO_KEYS = ['serpDisplayMode', 'serpInlineSubmode', 'overlayLayout'];
+      RADIO_KEYS.forEach(k => {
+        const checkedRadio = overlay.querySelector(`input[type="radio"][name="${k}"]:checked`);
+        if (checkedRadio) next[k] = checkedRadio.value;
       });
 
       /* Theme selection */
@@ -1255,7 +1816,10 @@
       saveSettings(SETTINGS);
       applyTheme(SETTINGS.activeTheme);
       applySettingsFab({ suppressHiddenHint: true });
+      /* A settings save invalidates any active peek state. */
+      if (lastInfoCardRender) lastInfoCardRender.peekSubmode = null;
       rerenderInfoCardIfPresent();
+      maybeEnsureSerpEntryPoint();
       showNotification('Settings saved & applied.', 4500);
       closeSettingsPanel();
     };
@@ -1271,13 +1835,163 @@
     if (ov) ov.remove();
   }
 
+  /**
+   * Close every top-level modal (info-card overlay, settings panel, customize picker)
+   * except the one whose selector is passed in `except`. Use before opening a new modal
+   * so two of them never end up stacked on top of each other.
+   *
+   * Note: only top-level chrome is closed here. Nested UI like the trailer modal lives
+   * inside the info card and is meant to overlay it, so it isn't included.
+   */
+  function closeOtherTopLevelOverlays(except) {
+    const selectors = ['.tmdb-overlay', '.tmdb-settings-overlay', '.tmdb-picker-overlay'];
+    selectors.forEach((sel) => {
+      if (sel === except) return;
+      document.querySelectorAll(sel).forEach((node) => {
+        try { node.remove(); } catch (e) { /* ignore */ }
+      });
+    });
+  }
+
   function checkbox(id, label, checked, fullRow) {
     const rowClass = fullRow ? ' class="full"' : '';
     return `<label${rowClass}><input id="cb-${id}" type="checkbox" ${checked ? 'checked' : ''}> ${label}</label>`;
   }
 
+  /** Inline radio-row helper for the Display modes group. `extra` accepts { id } to tag the row. */
+  function displayRadios(settingKey, fieldLabel, options, currentValue, extra = {}) {
+    const radios = options.map((opt) => {
+      const id = `dm-${settingKey}-${opt}`;
+      const isActive = String(currentValue) === String(opt);
+      const labelText = opt.charAt(0).toUpperCase() + opt.slice(1);
+      return `<label class="${isActive ? 'active' : ''}">
+        <input type="radio" name="${settingKey}" id="${id}" value="${opt}" ${isActive ? 'checked' : ''}>
+        <span>${labelText}</span>
+      </label>`;
+    }).join('');
+    const idAttr = extra.id ? ` id="${extra.id}"` : '';
+    return `<div class="tmdb-display-field" data-tm-radio-key="${settingKey}"${idAttr}>
+      <span class="tmdb-field-label">${fieldLabel}</span>
+      <div class="tmdb-radio-row">${radios}</div>
+    </div>`;
+  }
+
   /* Hotkey for settings panel (Shift+R) */
   document.addEventListener('keydown', (e) => { if (e.shiftKey && e.key.toLowerCase() === 'r') openSettingsPanel(); });
+
+  /* ----------------------------------------------------
+   * Customize picker — grouped checkbox modal for Custom layout selection
+   * -------------------------------------------------- */
+  function closeCustomizePicker() {
+    document.querySelector('.tmdb-picker-overlay')?.remove();
+  }
+
+  function openCustomizePicker(opts = {}) {
+    const fromSettings = !!opts.fromSettings;
+    closeCustomizePicker();
+    closeSettingsPanel();
+    closeOtherTopLevelOverlays('.tmdb-picker-overlay');
+
+    /* Cancel / dismiss flow: close picker and (if it was opened from the settings panel) restore it. */
+    const dismissPicker = () => {
+      closeCustomizePicker();
+      if (fromSettings) openSettingsPanel();
+    };
+
+    /* Working copy of the user's selection (lazily seeded from Featured on first open). */
+    const working = new Set(getCustomLinkIds());
+    const featuredSet = new Set(getFeaturedLinkIds());
+
+    const groupsHtml = LINK_CATEGORIES.map(cat => {
+      const entries = LINKS.filter(e => e.category === cat.id);
+      if (!entries.length) return '';
+      const rows = entries.map(e => {
+        const checked = working.has(e.id) ? 'checked' : '';
+        const star = featuredSet.has(e.id) ? `<span class="picker-star" title="Featured by default">★ Featured</span>` : '';
+        const labelEsc = String(e.label).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        return `<label class="picker-row">
+          <input type="checkbox" data-tm-link-id="${e.id}" ${checked}>
+          <span class="picker-label">${labelEsc}</span>
+          ${star}
+        </label>`;
+      }).join('');
+      return `<div class="picker-group" data-tm-cat="${cat.id}">
+        <div class="picker-group-head">
+          <h3>${cat.label}</h3>
+          <div class="picker-group-actions">
+            <button type="button" class="picker-mini-btn" data-tm-action="select-all">Select all</button>
+            <button type="button" class="picker-mini-btn" data-tm-action="clear">Clear</button>
+          </div>
+        </div>
+        <div class="picker-rows">${rows}</div>
+      </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tmdb-picker-overlay';
+    overlay.innerHTML = `
+      <div class="tmdb-picker ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" role="dialog" aria-modal="true">
+        <header>
+          <h2>Customize Custom layout</h2>
+          <button class="tmdb-btn ghost" id="tmdb-picker-close">✕</button>
+        </header>
+        <div class="picker-body">
+          <p class="picker-help">Pick exactly which links appear when the card is in <b>Custom</b> mode. ★ Featured tags links the author currently recommends. New script versions may add links; use <b>Reset to Featured</b> to follow updates.</p>
+          ${groupsHtml}
+        </div>
+        <footer>
+          <button type="button" class="tmdb-btn ghost" id="tmdb-picker-reset">Reset to Featured</button>
+          <div class="picker-spacer"></div>
+          <button type="button" class="tmdb-btn ghost" id="tmdb-picker-cancel">Cancel</button>
+          <button type="button" class="tmdb-btn primary" id="tmdb-picker-save">Save</button>
+        </footer>
+      </div>`;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) dismissPicker(); });
+    document.body.appendChild(overlay);
+
+    /* Checkbox bookkeeping */
+    overlay.querySelectorAll('input[type="checkbox"][data-tm-link-id]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = cb.getAttribute('data-tm-link-id');
+        if (cb.checked) working.add(id); else working.delete(id);
+      });
+    });
+
+    /* Per-group Select all / Clear */
+    overlay.querySelectorAll('.picker-group').forEach(group => {
+      const catId = group.getAttribute('data-tm-cat');
+      const setAll = (check) => {
+        group.querySelectorAll('input[type="checkbox"][data-tm-link-id]').forEach(cb => {
+          cb.checked = check;
+          const id = cb.getAttribute('data-tm-link-id');
+          if (check) working.add(id); else working.delete(id);
+        });
+      };
+      group.querySelector('[data-tm-action="select-all"]')?.addEventListener('click', () => setAll(true));
+      group.querySelector('[data-tm-action="clear"]')?.addEventListener('click', () => setAll(false));
+    });
+
+    overlay.querySelector('#tmdb-picker-close').onclick = dismissPicker;
+    overlay.querySelector('#tmdb-picker-cancel').onclick = dismissPicker;
+
+    overlay.querySelector('#tmdb-picker-reset').onclick = () => {
+      working.clear();
+      featuredSet.forEach(id => working.add(id));
+      overlay.querySelectorAll('input[type="checkbox"][data-tm-link-id]').forEach(cb => {
+        cb.checked = working.has(cb.getAttribute('data-tm-link-id'));
+      });
+    };
+
+    overlay.querySelector('#tmdb-picker-save').onclick = () => {
+      const allIds = new Set(getAllLinkIds());
+      const selected = LINKS.map(e => e.id).filter(id => working.has(id) && allIds.has(id));
+      SETTINGS = { ...SETTINGS, customLinkIds: selected };
+      saveSettings(SETTINGS);
+      closeCustomizePicker();
+      showNotification(`Saved ${selected.length} custom link${selected.length === 1 ? '' : 's'}.`, 2500);
+      rerenderInfoCardIfPresent();
+    };
+  }
 
   /* ----------------------------------------------------
    * Smart media detection (SERP)
@@ -1461,6 +2175,17 @@
       if (/^\/media\/tmdb-movie-/i.test(u.pathname)) return href;
     }
 
+    /* Trakt: lift any show URL (overview, season filter, or specific s/e) to the picked s/e. */
+    if (/^app\.trakt\.tv$/i.test(u.hostname)) {
+      const m = u.pathname.match(/^\/shows\/([^/]+)/i);
+      if (m) {
+        u.pathname = `/shows/${m[1]}/seasons/${s}/episodes/${e}`;
+        u.search = '';
+        u.hash = '';
+        return u.toString();
+      }
+    }
+
     // Torrent sites that support season/episode filters
     if (/^ext\.to$/i.test(u.hostname)) {
       if (qs.has('name_filter')) {
@@ -1531,13 +2256,20 @@
       const slug = year ? `${base}-${year}` : base;
       return { direct: `https://app.trakt.tv/movies/${slug}?mode=media`, search: searchQ + `&m=movie` };
     }
-    const snRaw = Number(seasonNumber);
-    const sn = Number.isFinite(snRaw) && snRaw >= 0 ? snRaw : 1;
+    /* TV: keep the URL faithful to what the caller knows. Don't synthesize "S1E1" when the
+       caller passed nothing — falling back to the show overview is more honest. */
+    const snRaw = seasonNumber != null && seasonNumber !== '' ? Number(seasonNumber) : NaN;
+    const sn = Number.isFinite(snRaw) && snRaw >= 0 ? snRaw : null;
     const enRaw = episodeNumber != null && episodeNumber !== '' ? Number(episodeNumber) : NaN;
     const en = Number.isFinite(enRaw) && enRaw > 0 ? enRaw : null;
-    const direct = en != null
-      ? `https://app.trakt.tv/shows/${base}/seasons/${sn}/episodes/${en}`
-      : `https://app.trakt.tv/shows/${base}?season=${sn}&mode=media`;
+    let direct;
+    if (sn != null && en != null) {
+      direct = `https://app.trakt.tv/shows/${base}/seasons/${sn}/episodes/${en}`;
+    } else if (sn != null) {
+      direct = `https://app.trakt.tv/shows/${base}?season=${sn}&mode=media`;
+    } else {
+      direct = `https://app.trakt.tv/shows/${base}?mode=media`;
+    }
     return { direct, search: searchQ + `&m=show` };
   }
 
@@ -1569,6 +2301,148 @@
   function imdbBgStyle() { return 'style="color:black;background-color:rgb(245 197 24);"'; }
   function traktStyle() { return 'style="color:rgb(237 95 36);font-weight:bold;"'; }
 
+  /* ----------------------------------------------------
+   * Info-card section builders (registry-driven)
+   * -------------------------------------------------- */
+
+  function buildHeaderHtml(ctx) {
+    const { tmdbID, vidType, imdb, traktUrls, stremioHref } = ctx;
+    return `
+        <div>
+          <strong>TMDb ID:</strong>
+          <span style="color:#1bb8d9;background-color:rgb(3,37,65);" class="tmdb-copy" id="tmdb-id" title="Click to copy">${tmdbID}</span>
+          <a href="https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(TMDb${linkExternalTabArrow()})</a>
+        </div>
+        <div id="imdb-id-container">
+          <strong>IMDb ID:</strong>
+          <span style="color:black;background-color:rgb(226,182,22);" class="tmdb-copy" id="imdb-id" title="Click to copy">${imdb || ''}</span>
+          ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(IMDb${linkExternalTabArrow()})</a>
+                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide${linkExternalTabArrow()})</a>` : ''}
+                    ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:bold;">(Trakt${linkExternalTabArrow()})</a>` : ''}
+                    ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
+                    ${SETTINGS.enableSimklLink ? `<a href="https://simkl.com/search?q=https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#fff;background-color:#000;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Simkl${linkExternalTabArrow()})</a></span>` : ''}
+        </div>
+        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="${stremioHref}" ${accentStyle()}>Open in Stremio${linkExternalTabArrow()}</a></div>` : ''}`;
+  }
+
+  /** YTS magnets — bespoke, movies-only, depends on torrents payload. */
+  function buildYtsMagnetsHtml(ctx, torrents, ytsLanguage) {
+    if (ctx.Type !== 'movie' || !SETTINGS.enableYtsTorrents || !torrents) return '';
+    const links = buildTorrentLinks(torrents, ctx.title);
+    if (!links?.length) return '';
+    const lang = ytsLanguage ? ` - Lang: [${String(ytsLanguage).toUpperCase()}]` : '';
+    const rows = links.map(link =>
+      `<a href="${link.magnet}" rel="noopener" ${accentStyle()}>${link.quality} (${link.size}) - ${link.type} ${link.video} (Audio Channel: ${link.audio})${lang} - Seeders:${link.seeds} Peers:${link.peers}</a><br/>`
+    ).join('');
+    return `<div style="margin-top:6px;"><strong>Torrents:</strong><br/>${rows}</div>`;
+  }
+
+  /** Render a single registry entry (or '' if filtered out). */
+  function buildEntryHtml(entry, ctx) {
+    if (!linkEntryApplies(entry, ctx.Type)) return '';
+    let out = '';
+    try { out = entry.renderHtml(ctx) || ''; } catch { out = ''; }
+    return out;
+  }
+
+  /** Build a category block: optional heading + entries that match filterFn. */
+  function buildCategorySectionHtml(catId, ctx, filterFn, opts = {}) {
+    const cat = LINK_CATEGORIES.find(c => c.id === catId);
+    if (!cat) return '';
+    const entries = LINKS.filter(e => e.category === catId && filterFn(e));
+    if (!entries.length) return '';
+    const rows = entries.map(e => buildEntryHtml(e, ctx)).join('');
+    if (!rows) return '';
+    const heading = opts.heading
+      ? `<strong>${cat.heading}</strong><br/>`
+      : '';
+    return `<div style="margin-top:6px;">${heading}${rows}</div>`;
+  }
+
+  /** Full layout — current behavior, regression-safe. */
+  function buildFullBodyHtml(ctx, ytsMagnetsHtml) {
+    const all = () => true;
+    const stream    = buildCategorySectionHtml('stream',   ctx, e => !!SETTINGS[e.gate] && !e.gate?.toString().includes('disabled'), { heading: false });
+    const disabled  = SETTINGS.disabledLinks
+      ? `<div style="margin-top:6px;"><strong>Disabled Links:</strong><br/>${LINKS.filter(e => e.category === 'stream' && e.gate === 'disabledLinks').map(e => buildEntryHtml(e, ctx)).join('')}</div>`
+      : '';
+    const frontends = SETTINGS.enableFrontendLinks
+      ? buildCategorySectionHtml('frontend', ctx, e => e.gate ? !!SETTINGS[e.gate] : true, { heading: true })
+      : '';
+    const sites = SETTINGS.enableTorrentSiteShortcuts
+      ? buildCategorySectionHtml('sites', ctx, e => e.gate ? !!SETTINGS[e.gate] : true, { heading: true })
+      : '';
+    return `${stream}${disabled}${frontends}${ytsMagnetsHtml}${sites}`;
+  }
+
+  /** Featured layout — registry entries where featured===true, grouped by category. */
+  function buildFeaturedBodyHtml(ctx) {
+    const stream    = buildCategorySectionHtml('stream',   ctx, e => e.featured && (e.gate ? !!SETTINGS[e.gate] : true), { heading: true });
+    const frontends = buildCategorySectionHtml('frontend', ctx, e => e.featured && (e.gate ? !!SETTINGS[e.gate] : true), { heading: true });
+    const sites     = buildCategorySectionHtml('sites',    ctx, e => e.featured && (e.gate ? !!SETTINGS[e.gate] : true), { heading: true });
+    const peek = `<button type="button" class="tmdb-card-footer-link" id="tmdb-peek-toggle">Show all links ↓</button>`;
+    return `${stream}${frontends}${sites}${peek}`;
+  }
+
+  /** Custom layout — entries in SETTINGS.customLinkIds, registry order. */
+  function buildCustomBodyHtml(ctx) {
+    const selected = new Set(getCustomLinkIds());
+    const filter = (e) => selected.has(e.id) && (e.gate ? !!SETTINGS[e.gate] : true);
+    const stream    = buildCategorySectionHtml('stream',   ctx, filter, { heading: true });
+    const frontends = buildCategorySectionHtml('frontend', ctx, filter, { heading: true });
+    const sites     = buildCategorySectionHtml('sites',    ctx, filter, { heading: true });
+    const anyContent = !!(stream || frontends || sites);
+    const empty = anyContent ? '' : `<div class="tmdb-empty-state">No links selected — click <b>Edit picks</b> to choose.</div>`;
+    const edit = `<button type="button" class="tmdb-card-footer-link" id="tmdb-edit-picks">Edit picks ✎</button>`;
+    return `${stream}${frontends}${sites}${empty}${edit}`;
+  }
+
+  /** Tabbed layout — header + tab strip + active pane. */
+  function buildTabbedBodyHtml(ctx, ytsMagnetsHtml) {
+    const tabs = [
+      { id: 'stream',   label: 'Stream',   build: () => buildCategorySectionHtml('stream',   ctx, e => e.gate ? !!SETTINGS[e.gate] : true, { heading: false }) },
+      { id: 'frontend', label: 'Frontend', build: () => SETTINGS.enableFrontendLinks ? buildCategorySectionHtml('frontend', ctx, e => e.gate ? !!SETTINGS[e.gate] : true, { heading: false }) : '' },
+      { id: 'torrents', label: 'Torrents', build: () => ytsMagnetsHtml || '' },
+      { id: 'sites',    label: 'Sites',    build: () => SETTINGS.enableTorrentSiteShortcuts ? buildCategorySectionHtml('sites', ctx, e => e.gate ? !!SETTINGS[e.gate] : true, { heading: false }) : '' },
+    ];
+    const built = tabs.map(t => ({ ...t, html: t.build() })).filter(t => t.html);
+    if (!built.length) return '';
+    let activeId = SETTINGS.lastInfoCardTab || 'stream';
+    if (!built.some(t => t.id === activeId)) activeId = built[0].id;
+    const strip = built.map(t =>
+      `<button type="button" class="tmdb-tab${t.id === activeId ? ' active' : ''}" data-tm-tab="${t.id}">${t.label}</button>`
+    ).join('');
+    const panes = built.map(t =>
+      `<div class="tmdb-tab-pane" data-tm-tab-pane="${t.id}" style="display:${t.id === activeId ? 'block' : 'none'};">${t.html}</div>`
+    ).join('');
+    return `<div class="tmdb-tabs">${strip}</div>${panes}`;
+  }
+
+  /** Mode-aware body assembly. */
+  function buildInlineBodyHtml(ctx, ytsMagnetsHtml, submode) {
+    switch (submode) {
+      case 'featured': return buildFeaturedBodyHtml(ctx);
+      case 'custom':   return buildCustomBodyHtml(ctx);
+      case 'tabbed':   return buildTabbedBodyHtml(ctx, ytsMagnetsHtml);
+      case 'full':
+      default:         return buildFullBodyHtml(ctx, ytsMagnetsHtml);
+    }
+  }
+
+  /** Mode-toggle pill group rendered into the card header (Featured / Custom / Tabbed / Full). */
+  function buildSubmodeToolbarHtml(activeSubmode) {
+    const modes = [
+      { id: 'featured', icon: '⚡', title: 'Featured links (author curated)' },
+      { id: 'custom',   icon: '★', title: 'Custom (your picks)' },
+      { id: 'tabbed',   icon: '☰', title: 'Tabbed view' },
+      { id: 'full',     icon: '≣', title: 'Full (everything)' },
+    ];
+    const btns = modes.map(m =>
+      `<button type="button" class="tmdb-mode-btn${m.id === activeSubmode ? ' active' : ''}" data-tm-submode="${m.id}" title="${m.title}" aria-label="${m.title}">${m.icon}</button>`
+    ).join('');
+    return `<div class="tmdb-card-toolbar" role="toolbar" aria-label="Display mode">${btns}</div>`;
+  }
+
   function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null, episodeDisplayName = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
@@ -1581,32 +2455,24 @@
     let query = '';
     let smashQuery = '';
     let multiQuery = '';
-    let html = '';
-    let eztv = '';
     let knabenCategory = '';
     let extCategory = '';
     const seasonParsed = specifiedSeason != null && specifiedSeason !== '' ? Number(specifiedSeason) : NaN;
     const episodeParsed = specifiedEpisode != null && specifiedEpisode !== '' ? Number(specifiedEpisode) : NaN;
+    /* Tracks whether the caller actually had episode context. Used so links that should NOT
+       silently default to "S1E1" (Trakt, Stremio) can render to the show/series overview
+       instead, while player links that need a concrete S/E still get the 1/1 fallback. */
+    const hasSpecifiedSeason = Number.isFinite(seasonParsed);
+    const hasSpecifiedEpisode = Number.isFinite(episodeParsed);
     let season_number = Number.isFinite(seasonParsed) ? seasonParsed : 1;
     let episode_number = Number.isFinite(episodeParsed) ? episodeParsed : 1;
     let sxe = '';
-    let torrentLinks = [];
 
     if (Type === 'movie') {
       vidType = 'movie';
       vidType1337 = 'Movies';
       knabenCategory = '3000000';
       extCategory = '1';
-      if (SETTINGS.enableYtsTorrents && torrents) {
-        torrentLinks = buildTorrentLinks(torrents, title);
-        if (torrentLinks?.length) {
-          html = `<div style="margin-top:6px;"><strong>Torrents:</strong><br/>`;
-          torrentLinks.forEach(link => {
-            html += `<a href="${link.magnet}" rel="noopener" ${accentStyle()}>${link.quality} (${link.size}) - ${link.type} ${link.video} (Audio Channel: ${link.audio})${ytsLanguage ? ` - Lang: [${ytsLanguage.toUpperCase()}]` : ""} - Seeders:${link.seeds} Peers:${link.peers}</a><br/>`;
-          });
-          html += `</div>`;
-        }
-      }
     } else if (Type === 'tv') {
       vidType = 'tv'; vidType1337 = 'TV'; ET_cat = '2';
       knabenCategory = '2000000';
@@ -1615,18 +2481,59 @@
       smashQuery = `?s=${season_number}&e=${episode_number}`;
       multiQuery = `&s=${season_number}&e=${episode_number}`;
       sxe = `s${String(season_number).padStart(2, '0')}e${String(episode_number).padStart(2, '0')}`;
-      if (SETTINGS.enableTorrentSiteShortcuts && imdb) {
-        eztv = `<a href="https://eztvx.to/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>EZTVx.to${linkExternalTabArrow()}</a> - <a href="https://eztv1.xyz/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://eztv.yt/search/${imdb}" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`;
-      }
     } else {
       showNotification('No Results found!'); hideButton(); return;
     }
 
-    const traktUrls = buildTraktAppUrls(vidType, title, date, season_number, episode_number);
-    const stremioHref = buildStremioDetailHref(vidType, imdb, season_number, episode_number);
+    const traktUrls = buildTraktAppUrls(
+      vidType,
+      title,
+      date,
+      hasSpecifiedSeason ? season_number : null,
+      hasSpecifiedEpisode ? episode_number : null,
+    );
+    const stremioHref = buildStremioDetailHref(
+      vidType,
+      imdb,
+      hasSpecifiedSeason ? season_number : null,
+      hasSpecifiedEpisode ? episode_number : null,
+    );
+
+    /* Preserve the prior peekSubmode so re-renders keep the user's expanded state. */
+    const prevPeek = lastInfoCardRender ? lastInfoCardRender.peekSubmode : null;
     lastInfoCardRender = {
       data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage, episodeDisplayName,
+      peekSubmode: prevPeek || null,
     };
+
+    /* Resolve active submode. Inside the .tmdb-overlay modal the layout is driven by
+       SETTINGS.overlayLayout (forward-looking knob in the Display panel); on SERP-inline
+       it's serpInlineSubmode. A peek state (Show all ↓) transiently overrides both. */
+    const surfaceCfg = getActiveSurfaceConfig();
+    const willBeInModal = surfaceCfg.surface === 'overlay' || surfaceCfg.displayMode === 'overlay';
+    let effectiveSubmode;
+    if (lastInfoCardRender.peekSubmode) {
+      effectiveSubmode = lastInfoCardRender.peekSubmode;
+    } else if (willBeInModal) {
+      effectiveSubmode = SETTINGS.overlayLayout || 'full';
+    } else {
+      effectiveSubmode = surfaceCfg.inlineSubmode;
+    }
+
+    const ctx = {
+      tmdbID, title, date, Type, vidType, vidType1337, ET_cat,
+      query, smashQuery, multiQuery, sxe, knabenCategory, extCategory,
+      imdb, traktUrls, stremioHref,
+    };
+
+    const ytsMagnetsHtml = buildYtsMagnetsHtml(ctx, torrents, ytsLanguage);
+    const headerHtml = buildHeaderHtml(ctx);
+    const bodyHtml = buildInlineBodyHtml(ctx, ytsMagnetsHtml, effectiveSubmode);
+
+    /* Toolbar shows everywhere — including inside the modal — so users can switch
+       layouts on the fly. Re-renders triggered from inside the modal are detected by
+       rerenderInfoCardIfPresent which puts the card back into the overlay. */
+    const toolbarHtml = buildSubmodeToolbarHtml(effectiveSubmode);
 
     const episodeSub =
       Type === 'tv' && episodeDisplayName
@@ -1636,78 +2543,12 @@
     const container = document.createElement('div');
     container.className = 'tmdb-info-card';
     container.innerHTML = `
+      ${toolbarHtml}
       <div class="tmdb-title">${title} (${date})</div>
       ${episodeSub}
       <div id="tmdb-details">
-        <div>
-          <strong>TMDb ID:</strong>
-          <span style="color:#1bb8d9;background-color:rgb(3,37,65);" class="tmdb-copy" id="tmdb-id" title="Click to copy">${tmdbID}</span>
-          <a href="https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#1bb8d9;font-weight:bold;">(TMDb${linkExternalTabArrow()})</a>
-        </div>
-        <div>
-          <strong>IMDb ID:</strong>
-          <span style="color:black;background-color:rgb(226,182,22);" class="tmdb-copy" id="imdb-id" title="Click to copy">${imdb || ''}</span>
-          ${imdb ? `<a href="https://www.imdb.com/title/${imdb}" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(IMDb${linkExternalTabArrow()})</a>
-                    <a href="https://www.imdb.com/title/${imdb}/parentalguide" ${linkTargetAttr()} style="color:rgb(226,182,22);font-weight:bold;">(Parental Guide${linkExternalTabArrow()})</a>` : ''}
-                    ${SETTINGS.enableTraktLink ? `<span style="margin-left:6px;"><a href="${traktUrls.direct}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:bold;">(Trakt${linkExternalTabArrow()})</a>` : ''}
-                    ${SETTINGS.enableTraktSearchLink ? `<a href="${traktUrls.search}" ${linkTargetAttr()} style="color:#ff6f00;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Trakt search)</a></span>` : ''}
-                    ${SETTINGS.enableSimklLink ? `<a href="https://simkl.com/search?q=https://themoviedb.org/${vidType}/${tmdbID}" ${linkTargetAttr()} style="color:#fff;background-color:#000;font-weight:600;opacity:.88;font-size:13px;margin-left:4px;">(Simkl${linkExternalTabArrow()})</a></span>` : ''}
-        </div>
-        ${SETTINGS.enableStremioLink && imdb ? `<div style="margin-top:6px;"><a href="${stremioHref}" ${accentStyle()}>Open in Stremio${linkExternalTabArrow()}</a></div>` : ''}
-
-        ${SETTINGS.enableStreamingLinks ? `
-        <div style="margin-top:6px;">
-          <a href="https://player.videasy.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.net (recommended)${linkExternalTabArrow()}</a><br/>
-          <a href="https://cinemaos.tech/player/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS.tech (fastest)${linkExternalTabArrow()}</a><br/>
-          <a href="https://cinesrc.st/embed/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineSrc.st${linkExternalTabArrow()}</a> (Supports
-          <a href="https://cinesrc.st/download/${vidType}/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Direct Download</a>)<br/>
-          <a href="https://www.vidking.net/embed/${vidType}/${tmdbID}${query}?color=e50914" ${linkTargetAttr()} ${accentStyle()}>Watch on VidKing.net${linkExternalTabArrow()}</a><br/>
-          <a href="https://vsembed.ru/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VsEmbed.ru${linkExternalTabArrow()}</a><br/>
-          <a href="https://multiembed.mov/?video_id=${tmdbID}&tmdb=1${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>
-          <a href="https://111movies.net/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>
-          <a href="https://vidfast.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>
-          <a href="https://vidrock.net/${vidType}/${tmdbID}${query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>
-          <a href="https://vidlink.pro/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidLink.pro${linkExternalTabArrow()}</a><br/>
-        </div>` : ''}
-
-        ${SETTINGS.disabledLinks ? `
-        <div style="margin-top:6px;">
-          <strong>Disabled Links:</strong><br/>
-          <a href="https://vidsrc.to/embed/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>
-        </div>` : ''}
-
-        ${SETTINGS.enableFrontendLinks ? `
-        <div style="margin-top:6px;">
-          <strong>Watch on frontends:</strong><br/>
-          <a href="https://www.cineby.sc/${vidType}/${tmdbID}${query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a>
-          <a href="https://www.cineby.sc/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
-          <a href="https://pstream.net/media/tmdb-${vidType}-${tmdbID}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${vidType === 'tv' ? '1' : ''}">Watch on PStream${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>
-          <a href="https://xprime.su/watch/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>
-          <a href="https://cinemaos.live/${vidType}/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a>
-          <a href="https://cinemaos.live/${vidType}/${tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
-          <a href="https://shuttletv.su/watch/${tmdbID}${smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>
-          <a href="https://www.rivestream.app/watch?type=${vidType}&id=${tmdbID}${multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on RiveStream${linkExternalTabArrow()}</a><br/>
-          <a href="https://hexa.su/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a>
-          <a href="https://hexa.su/details/${vidType}/${tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>
-          <a href="https://67movies.net/watch/${vidType}/${tmdbID}${query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>
-        </div>` : ''}
-
-        ${html}
-
-        ${SETTINGS.enableTorrentSiteShortcuts ? `
-        <div style="margin-top:6px;">
-          <strong>Search on Torrent Sites:</strong><br/>
-          <a href="https://1337x.to/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>1337x.to${linkExternalTabArrow()}</a> -
-          <a href="https://1337x.st/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> -
-          <a href="https://x1337x.cc/category-search/${title}/${vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>
-          ${eztv}
-          <a href="https://www.limetorrents.fun/search/${vidType1337}/${title}" ${linkTargetAttr()} ${accentStyle()}>LimeTorrents.fun${linkExternalTabArrow()}</a><br/>
-          <a href="https://knaben.org/search/${encodeURIComponent(title)}/${knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>Knaben.org${linkExternalTabArrow()}</a>${Type === "tv" ? ` - <a data-tm-sxe-link="1" href="https://knaben.org/search/${encodeURIComponent(`${title} ${sxe}`)}/${knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>${sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>
-          <a href="https://ext.to/browse/?with_adult=1&cat=${extCategory}${imdb ? `&imdb_id=${imdb}` : `&name_filter=${encodeURIComponent(title)}`}" ${linkTargetAttr()} ${accentStyle()}>Ext.to${linkExternalTabArrow()}</a>${Type === "tv" ? ` - <a data-tm-sxe-link="1" href="https://ext.to/browse/?with_adult=1&cat=${extCategory}${imdb ? `&imdb_id=${imdb}&name_filter=${sxe}` : `&name_filter=${encodeURIComponent(`${title} ${sxe}`)}`}" ${linkTargetAttr()} ${accentStyle()}>${sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>
-          <a href="https://thepiratebay.org/search.php?q=${title}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} ${accentStyle()}>ThePirateBay.org${linkExternalTabArrow()}</a><br/>
-          <a href="https://extratorrent.st/search/?new=1&search=${title}&s_cat=${ET_cat}" ${linkTargetAttr()} ${accentStyle()}>ExtraTorrent.st${linkExternalTabArrow()}</a><br/>
-          <a href="https://rutor.is/search/${title}" ${linkTargetAttr()} ${accentStyle()}>Rutor.is${linkExternalTabArrow()}</a><br/>
-        </div>` : ''}
+        ${headerHtml}
+        ${bodyHtml}
         ${formatSpecialThanksHtml(false)}
       </div>`;
 
@@ -1720,6 +2561,68 @@
 
     tmdb_id?.addEventListener('click', () => { GM_setClipboard(tmdbID, 'text'); showNotification('TMDB id copied to clipboard'); });
     imdb_id?.addEventListener('click', () => { if (imdb) { GM_setClipboard(imdb, 'text'); showNotification('IMDB id copied to clipboard'); } });
+
+    /* ---- On-card submode toggle ---- */
+    container.querySelectorAll('.tmdb-mode-btn[data-tm-submode]').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const submode = btn.getAttribute('data-tm-submode');
+        const key = getActiveSubmodeSettingKey();
+        if (!key || !submode) return;
+        /* If user toggles peek-expanded card back to a real mode, clear the peek. */
+        if (lastInfoCardRender) lastInfoCardRender.peekSubmode = null;
+        SETTINGS = { ...SETTINGS, [key]: submode };
+        saveSettings(SETTINGS);
+        rerenderInfoCardIfPresent();
+      });
+    });
+
+    /* ---- Tabbed mode: tab switching ---- */
+    container.querySelectorAll('.tmdb-tab[data-tm-tab]').forEach(tab => {
+      tab.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const tabId = tab.getAttribute('data-tm-tab');
+        if (!tabId) return;
+        container.querySelectorAll('.tmdb-tab[data-tm-tab]').forEach(t => t.classList.toggle('active', t === tab));
+        container.querySelectorAll('[data-tm-tab-pane]').forEach(p => {
+          p.style.display = (p.getAttribute('data-tm-tab-pane') === tabId) ? 'block' : 'none';
+        });
+        SETTINGS = { ...SETTINGS, lastInfoCardTab: tabId };
+        saveSettings(SETTINGS);
+      });
+    });
+
+    /* ---- Featured peek toggle (Show all ↓ / Collapse) ---- */
+    const peekBtn = container.querySelector('#tmdb-peek-toggle');
+    peekBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      if (!lastInfoCardRender) return;
+      lastInfoCardRender.peekSubmode = 'full';
+      rerenderInfoCardIfPresent();
+    });
+    /* Show a "Collapse" link instead of "Show all" while peeking in Full mode. */
+    if (lastInfoCardRender?.peekSubmode === 'full') {
+      /* The current rendered submode is 'full' due to peek. Show a collapse hint at the bottom of details. */
+      const collapse = document.createElement('button');
+      collapse.type = 'button';
+      collapse.className = 'tmdb-card-footer-link';
+      collapse.id = 'tmdb-peek-collapse';
+      collapse.textContent = 'Collapse ↑';
+      collapse.style.marginLeft = '8px';
+      detailsDiv.appendChild(collapse);
+      collapse.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        if (!lastInfoCardRender) return;
+        lastInfoCardRender.peekSubmode = null;
+        rerenderInfoCardIfPresent();
+      });
+    }
+
+    /* ---- Custom mode: Edit picks → open Customize picker ---- */
+    container.querySelector('#tmdb-edit-picks')?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      openCustomizePicker();
+    });
 
     /* P-Stream TV uses TMDb season id + episode id in the path (not S/E indices). Resolve after mount. */
     if (Type === 'tv' && SETTINGS.enableFrontendLinks) {
@@ -1780,18 +2683,23 @@
       }
     } catch (e) { /* ignore */ }
 
-    /* Play another episode (TV only) */
+    /* Play another episode (TV only).
+       Anchor on #imdb-id-container (always rendered) rather than the Stremio link
+       which can be toggled off via enableStremioLink. */
     if (Type === 'tv') {
       try {
-        const stremioLinkDiv = detailsDiv.querySelector('a[href^="stremio://detail/"]')?.parentNode || null;
+        const imdbIdContainer = detailsDiv.querySelector('#imdb-id-container');
         const playAnotherBtn = document.createElement('button');
         playAnotherBtn.className = 'tmdb-btn ghost';
         playAnotherBtn.id = 'tmdb-play-another';
         playAnotherBtn.style.marginTop = '8px';
         playAnotherBtn.textContent = 'Play another episode';
 
-        if (stremioLinkDiv) detailsDiv.insertBefore(playAnotherBtn, stremioLinkDiv);
-        else detailsDiv.appendChild(playAnotherBtn);
+        if (imdbIdContainer && imdbIdContainer.parentNode) {
+          imdbIdContainer.parentNode.insertBefore(playAnotherBtn, imdbIdContainer.nextSibling);
+        } else {
+          detailsDiv.appendChild(playAnotherBtn);
+        }
 
         let controlsShown = false;
         let controlsAreaEl = null;
@@ -2152,6 +3060,111 @@
   }
 
   /* ----------------------------------------------------
+   * SERP Overlay mode — Watch Now button instead of inline card
+   * -------------------------------------------------- */
+  function removeSerpOverlayButton() {
+    document.getElementById('tmdb-serp-overlay-btn')?.remove();
+  }
+
+  async function triggerSerpOverlay() {
+    if (document.querySelector('.tmdb-overlay')) return;
+    closeOtherTopLevelOverlays('.tmdb-overlay');
+    const existingCard = document.querySelector('.tmdb-info-card');
+    if (existingCard) {
+      /* Repurpose existing card by moving it into a fresh overlay. */
+      const overlay = document.createElement('div');
+      overlay.className = 'tmdb-overlay';
+      overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#tmdb-overlay-inner').appendChild(existingCard);
+      return;
+    }
+    const btn = document.getElementById('tmdb-serp-overlay-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    try {
+      const overlay = document.createElement('div');
+      overlay.className = 'tmdb-overlay';
+      overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      const ok = await fetchWithFallback(cleanedQuery);
+      const card = document.querySelector('.tmdb-info-card');
+      if (ok && card) {
+        overlay.querySelector('#tmdb-overlay-inner').appendChild(card);
+      } else {
+        overlay.remove();
+        showNotification('No movie/TV card found for this search.');
+      }
+    } catch (e) {
+      document.querySelector('.tmdb-overlay')?.remove();
+      showNotification('Failed to load overlay.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '▶ Watch Now 😉'; }
+    }
+  }
+
+  function ensureSerpOverlayButton() {
+    if (!isSearch() || !currentSerpEngineEnabled()) return;
+    const mount = getMountTarget();
+    if (!mount?.isConnected) return;
+    /* If a card is already shown (legacy inline state), don't add the button. */
+    if (mount.querySelector('.tmdb-info-card')) return;
+    let btn = document.getElementById('tmdb-serp-overlay-btn');
+    if (btn) {
+      if (!btn.isConnected || btn.parentElement !== mount) mount.prepend(btn);
+      btn.disabled = false;
+      return;
+    }
+    btn = document.createElement('button');
+    btn.id = 'tmdb-serp-overlay-btn';
+    btn.type = 'button';
+    btn.textContent = '▶ Watch Now 😉';
+    btn.addEventListener('click', (e) => { e.preventDefault(); void triggerSerpOverlay(); });
+    mount.prepend(btn);
+  }
+
+  /**
+   * Re-evaluate which SERP entry point is appropriate after the user changes settings
+   * (e.g. flipping displayMode between 'inline' and 'overlay').
+   */
+  function maybeEnsureSerpEntryPoint() {
+    if (!isSearch()) return;
+    if (!currentSerpEngineEnabled()) return;
+    const cfg = getActiveSurfaceConfig();
+    if (cfg.surface !== 'serp') return;
+    if (cfg.displayMode === 'overlay') {
+      /* Switching to Overlay: drop any inline manual button and any inline card. */
+      document.getElementById('tmdb-button')?.remove();
+      const mount = getMountTarget();
+      mount?.querySelector('.tmdb-info-card')?.remove();
+      ensureSerpOverlayButton();
+    } else {
+      /* Switching to Inline: drop overlay button; if no card present, show manual button. */
+      removeSerpOverlayButton();
+      ensureSerpManualButton();
+    }
+  }
+
+  /* Shift+P on SERP toggles the overlay — matches the global hotkey used on IMDb/Trakt/Simkl/YTS.
+     Installed once per page; the in-handler check honors the live `serpDisplayMode` setting so
+     flipping modes via Settings keeps working without a page reload. */
+  let serpGlobalKeydownInstalled = false;
+  function installSerpGlobalKeydownOnce() {
+    if (serpGlobalKeydownInstalled) return;
+    serpGlobalKeydownInstalled = true;
+    document.addEventListener('keydown', (e) => {
+      if (!e.shiftKey || e.key.toLowerCase() !== 'p') return;
+      if (!isSearch() || !currentSerpEngineEnabled()) return;
+      if ((SETTINGS.serpDisplayMode || 'inline') !== 'overlay') return;
+      if (!cleanedQuery) { showNotification('No search query detected to fetch.'); return; }
+      const ov = document.querySelector('.tmdb-overlay');
+      if (ov) { ov.remove(); return; }
+      void triggerSerpOverlay();
+    });
+  }
+
+  /* ----------------------------------------------------
   * IMDb Page Handler
   * -------------------------------------------------- */
   const imdbCache = new Map();
@@ -2239,6 +3252,7 @@
     const episodeTitle = cached && typeof cached === 'object' && cached.episodeTitle ? cached.episodeTitle : null;
     const seriesImdbId = cached && typeof cached === 'object' && cached.seriesImdbId ? cached.seriesImdbId : null;
     document.querySelector('.tmdb-overlay')?.remove();
+    closeOtherTopLevelOverlays('.tmdb-overlay');
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-overlay';
     overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
@@ -2694,6 +3708,7 @@
 
   async function renderTraktOverlay(data, season = null, episode = null) {
     document.querySelector('.tmdb-overlay')?.remove();
+    closeOtherTopLevelOverlays('.tmdb-overlay');
     const overlay = document.createElement('div');
     overlay.className = 'tmdb-overlay';
     overlay.innerHTML = `<div class="tmdb-overlay-inner ${SETTINGS.enableTransparencyMode ? 'transparency' : 'no-transparency'}" id="tmdb-overlay-inner"></div>`;
@@ -3121,93 +4136,120 @@
   * Action time
   * -------------------------------------------------- */
   if (isSearch() && currentSerpEngineEnabled()) {
-    let serpAutoFetchTriggered = false;
-    async function runSerpAutoFetchOnce() {
-      if (serpAutoFetchTriggered || !SETTINGS.autoDetectOnSERP) return;
-      if (!serpLooksLikeMedia()) return;
-      serpAutoFetchTriggered = true;
-      const ok = await fetchWithFallback(cleanedQuery);
-      if (!ok) ensureSerpManualButton();
-    }
+    const _serpCfg = getActiveSurfaceConfig();
+    const _serpOverlayMode = _serpCfg.surface === 'serp' && _serpCfg.displayMode === 'overlay';
 
-    if (SETTINGS.autoDetectOnSERP && serpLooksLikeMedia()) {
-      // Brave / DuckDuckGo results can re-render after load; delay the fetch so the injected card survives.
-      if (isBrave && SETTINGS.enableOnBravePage) {
-        setTimeout(() => void runSerpAutoFetchOnce(), 2200);
-      } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
-        setTimeout(() => void runSerpAutoFetchOnce(), 1800);
-      } else {
-        void runSerpAutoFetchOnce();
+    /* Shift+P toggles the SERP overlay (matches IMDb/Trakt/Simkl/YTS). Installed regardless of
+       the current mode so flipping displayMode via Settings stays interactive. */
+    installSerpGlobalKeydownOnce();
+
+    if (_serpOverlayMode) {
+      /* Overlay mode: don't auto-fetch inline; show a Watch Now button that lifts the card into an overlay on click. */
+      ensureSerpOverlayButton();
+      if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage) || (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage)) {
+        if (isBrave && SETTINGS.enableOnBravePage) {
+          setTimeout(() => ensureSerpOverlayButton(), 2800);
+          setTimeout(() => ensureSerpOverlayButton(), 8000);
+          setTimeout(() => ensureSerpOverlayButton(), 15000);
+        } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
+          setTimeout(() => ensureSerpOverlayButton(), 400);
+          setTimeout(() => ensureSerpOverlayButton(), 1800);
+          setTimeout(() => ensureSerpOverlayButton(), 4500);
+        } else {
+          setTimeout(() => ensureSerpOverlayButton(), 150);
+          setTimeout(() => ensureSerpOverlayButton(), 900);
+          setTimeout(() => ensureSerpOverlayButton(), 2500);
+        }
       }
     } else {
-      ensureSerpManualButton();
-    }
+      let serpAutoFetchTriggered = false;
+      async function runSerpAutoFetchOnce() {
+        if (serpAutoFetchTriggered || !SETTINGS.autoDetectOnSERP) return;
+        if (!serpLooksLikeMedia()) return;
+        serpAutoFetchTriggered = true;
+        const ok = await fetchWithFallback(cleanedQuery);
+        if (!ok) ensureSerpManualButton();
+      }
 
-    if (SETTINGS.autoDetectOnSERP && !serpAutoFetchTriggered) {
-      const isBingSerp = isBing && SETTINGS.enableOnBingPage;
-      const isBraveSerp = isBrave && SETTINGS.enableOnBravePage;
-      const isDdgSerp = isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage;
-      const moRoot = isGoogle && SETTINGS.enableOnGooglePage
-        ? (document.getElementById('main') || document.body)
-        : isBingSerp ? document.body
-          : isBraveSerp ? (document.getElementById('results') || document.body)
-            : isDdgSerp ? (document.querySelector('[data-testid="web-vertical"]') || document.body)
-              : null;
-      if (moRoot) {
-        let moRaf = 0;
-        let braveDebounce = 0;
-        let ddgDebounce = 0;
-        const scheduleSerpTry = () => {
-          if (isBraveSerp) {
-            if (braveDebounce) clearTimeout(braveDebounce);
-            // Wait for Brave's DOM to settle before injecting the card.
-            braveDebounce = setTimeout(() => { braveDebounce = 0; void runSerpAutoFetchOnce(); }, 1700);
-            return;
-          }
-          if (isDdgSerp) {
-            if (ddgDebounce) clearTimeout(ddgDebounce);
-            ddgDebounce = setTimeout(() => { ddgDebounce = 0; void runSerpAutoFetchOnce(); }, 1200);
-            return;
-          }
-          if (moRaf) return;
-          moRaf = requestAnimationFrame(() => { moRaf = 0; void runSerpAutoFetchOnce(); });
-        };
-        const mo = new MutationObserver(scheduleSerpTry);
-        mo.observe(moRoot, { childList: true, subtree: true });
-        const observeMs = isBingSerp ? 25000 : isBraveSerp ? 35000 : isDdgSerp ? 32000 : 15000;
-        setTimeout(() => { try { mo.disconnect(); } catch (e) { /* ignore */ } }, observeMs);
-        scheduleSerpTry();
-        if (isBraveSerp) {
-          setTimeout(() => void runSerpAutoFetchOnce(), 2600);
-          setTimeout(() => void runSerpAutoFetchOnce(), 7500);
-        } else if (isDdgSerp) {
-          setTimeout(() => void runSerpAutoFetchOnce(), 600);
-          setTimeout(() => void runSerpAutoFetchOnce(), 2400);
-          setTimeout(() => void runSerpAutoFetchOnce(), 7200);
+      if (SETTINGS.autoDetectOnSERP && serpLooksLikeMedia()) {
+        // Brave / DuckDuckGo results can re-render after load; delay the fetch so the injected card survives.
+        if (isBrave && SETTINGS.enableOnBravePage) {
+          setTimeout(() => void runSerpAutoFetchOnce(), 2200);
+        } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
+          setTimeout(() => void runSerpAutoFetchOnce(), 1800);
         } else {
-          setTimeout(() => void runSerpAutoFetchOnce(), 400);
-          setTimeout(() => void runSerpAutoFetchOnce(), 2000);
+          void runSerpAutoFetchOnce();
         }
-        if (isBingSerp) {
-          setTimeout(() => void runSerpAutoFetchOnce(), 5000);
-          setTimeout(() => void runSerpAutoFetchOnce(), 9000);
+      } else {
+        ensureSerpManualButton();
+      }
+
+      if (SETTINGS.autoDetectOnSERP && !serpAutoFetchTriggered) {
+        const isBingSerp = isBing && SETTINGS.enableOnBingPage;
+        const isBraveSerp = isBrave && SETTINGS.enableOnBravePage;
+        const isDdgSerp = isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage;
+        const moRoot = isGoogle && SETTINGS.enableOnGooglePage
+          ? (document.getElementById('main') || document.body)
+          : isBingSerp ? document.body
+            : isBraveSerp ? (document.getElementById('results') || document.body)
+              : isDdgSerp ? (document.querySelector('[data-testid="web-vertical"]') || document.body)
+                : null;
+        if (moRoot) {
+          let moRaf = 0;
+          let braveDebounce = 0;
+          let ddgDebounce = 0;
+          const scheduleSerpTry = () => {
+            if (isBraveSerp) {
+              if (braveDebounce) clearTimeout(braveDebounce);
+              // Wait for Brave's DOM to settle before injecting the card.
+              braveDebounce = setTimeout(() => { braveDebounce = 0; void runSerpAutoFetchOnce(); }, 1700);
+              return;
+            }
+            if (isDdgSerp) {
+              if (ddgDebounce) clearTimeout(ddgDebounce);
+              ddgDebounce = setTimeout(() => { ddgDebounce = 0; void runSerpAutoFetchOnce(); }, 1200);
+              return;
+            }
+            if (moRaf) return;
+            moRaf = requestAnimationFrame(() => { moRaf = 0; void runSerpAutoFetchOnce(); });
+          };
+          const mo = new MutationObserver(scheduleSerpTry);
+          mo.observe(moRoot, { childList: true, subtree: true });
+          const observeMs = isBingSerp ? 25000 : isBraveSerp ? 35000 : isDdgSerp ? 32000 : 15000;
+          setTimeout(() => { try { mo.disconnect(); } catch (e) { /* ignore */ } }, observeMs);
+          scheduleSerpTry();
+          if (isBraveSerp) {
+            setTimeout(() => void runSerpAutoFetchOnce(), 2600);
+            setTimeout(() => void runSerpAutoFetchOnce(), 7500);
+          } else if (isDdgSerp) {
+            setTimeout(() => void runSerpAutoFetchOnce(), 600);
+            setTimeout(() => void runSerpAutoFetchOnce(), 2400);
+            setTimeout(() => void runSerpAutoFetchOnce(), 7200);
+          } else {
+            setTimeout(() => void runSerpAutoFetchOnce(), 400);
+            setTimeout(() => void runSerpAutoFetchOnce(), 2000);
+          }
+          if (isBingSerp) {
+            setTimeout(() => void runSerpAutoFetchOnce(), 5000);
+            setTimeout(() => void runSerpAutoFetchOnce(), 9000);
+          }
         }
       }
-    }
 
-    if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage) || (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage)) {
-      if (isBrave && SETTINGS.enableOnBravePage) {
-        setTimeout(() => ensureSerpManualButton(), 2800);
-        setTimeout(() => ensureSerpManualButton(), 8000);
-        setTimeout(() => ensureSerpManualButton(), 15000);
-      } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
-        setTimeout(() => ensureSerpManualButton(), 400);
-        setTimeout(() => ensureSerpManualButton(), 1800);
-        setTimeout(() => ensureSerpManualButton(), 4500);
-      } else {
-        setTimeout(() => ensureSerpManualButton(), 150);
-        setTimeout(() => ensureSerpManualButton(), 900);
-        setTimeout(() => ensureSerpManualButton(), 2500);
+      if ((isBing && SETTINGS.enableOnBingPage) || (isBrave && SETTINGS.enableOnBravePage) || (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage)) {
+        if (isBrave && SETTINGS.enableOnBravePage) {
+          setTimeout(() => ensureSerpManualButton(), 2800);
+          setTimeout(() => ensureSerpManualButton(), 8000);
+          setTimeout(() => ensureSerpManualButton(), 15000);
+        } else if (isDuckDuckGo && SETTINGS.enableOnDuckDuckGoPage) {
+          setTimeout(() => ensureSerpManualButton(), 400);
+          setTimeout(() => ensureSerpManualButton(), 1800);
+          setTimeout(() => ensureSerpManualButton(), 4500);
+        } else {
+          setTimeout(() => ensureSerpManualButton(), 150);
+          setTimeout(() => ensureSerpManualButton(), 900);
+          setTimeout(() => ensureSerpManualButton(), 2500);
+        }
       }
     }
   } else if (isImdb && SETTINGS.enableOnImdbPage) {
@@ -3225,5 +4267,8 @@
     registerFabMenuCommands();
     applySettingsFab();
   } catch (e) { /* ignore */ }
+
+  /* New-link detection across script updates (does nothing on first install). */
+  try { setTimeout(() => { try { maybeShowNewLinksHint(); } catch (e) { /* ignore */ } }, 1500); } catch (e) { /* ignore */ }
 
 })();
