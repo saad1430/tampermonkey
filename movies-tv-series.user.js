@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1
+// @version      1.9.2
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -222,9 +222,9 @@
   const LINKS = [
     /* ---- Streaming (single anchor per row) ---- */
     {
-      id: 'videasy', category: 'stream', label: 'VidEasy.net (recommended)', featured: true,
+      id: 'videasy', category: 'stream', label: 'VidEasy.to (recommended)', featured: true,
       gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://player.videasy.net/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.net (recommended)${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://player.videasy.to/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.to (recommended)${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'cinemaos-tech', category: 'stream', label: 'CinemaOS.tech (fastest)', featured: true,
@@ -262,9 +262,9 @@
       renderHtml: (c) => `<a href="https://vidfast.pro/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>`,
     },
     {
-      id: 'vidrock', category: 'stream', label: 'VidRock.net', featured: false,
+      id: 'vidrock', category: 'stream', label: 'VidRock.ru', featured: false,
       gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://vidrock.net/${c.vidType}/${c.tmdbID}${c.query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.net${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://vidrock.ru/${c.vidType}/${c.tmdbID}${c.query}?autoplay=true" ${linkTargetAttr()} ${accentStyle()}>Watch on VidRock.ru${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'vidlink', category: 'stream', label: 'VidLink.pro', featured: false,
@@ -281,27 +281,32 @@
     {
       id: 'cineby', category: 'frontend', label: 'Cineby (+ More Info)', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://www.cineby.sc/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a> <a href="https://www.cineby.sc/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+      renderHtml: (c) => `<a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a> <a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
-      id: 'pstream', category: 'frontend', label: 'PStream (4K possible)', featured: true,
+      id: 'pstream', category: 'frontend', label: 'Aether (4K possible)', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://pstream.net/media/tmdb-${c.vidType}-${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${c.vidType === 'tv' ? '1' : ''}">Watch on PStream${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>`,
+      renderHtml: (c) => `<a href="https://aether.bar/media/tmdb-${c.vidType}-${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${c.vidType === 'tv' ? '1' : ''}">Watch on Aether${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>`,
     },
     {
-      id: 'xprime', category: 'frontend', label: 'XPrime (4K possible)', featured: true,
+      id: 'fmovies', category: 'frontend', label: 'FMovies', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://xprime.su/watch/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on XPrime${linkExternalTabArrow()}</a> <small>(4K possible)</small><br/>`,
-    },
-    {
-      id: 'cinemaos-live', category: 'frontend', label: 'CinemaOS (+ More Info)', featured: false,
-      gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://cinemaos.live/${c.vidType}/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a> <a href="https://cinemaos.live/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+      renderHtml: (c) => `<a href="https://www.fmovies.nz/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on FMovies${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'shuttletv', category: 'frontend', label: 'ShuttleTV', featured: false,
       gate: 'enableFrontendLinks',
       renderHtml: (c) => `<a href="https://shuttletv.su/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: '67movies', category: 'frontend', label: '67Movies', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://67movies.net/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'cinemaos-live', category: 'frontend', label: 'CinemaOS (+ More Info)', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://cinemaos.live/${c.vidType}/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CinemaOS${linkExternalTabArrow()}</a> <a href="https://cinemaos.live/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
       id: 'rivestream', category: 'frontend', label: 'RiveStream', featured: false,
@@ -313,17 +318,25 @@
       gate: 'enableFrontendLinks',
       renderHtml: (c) => `<a href="https://hexa.su/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a> <a href="https://hexa.su/details/${c.vidType}/${c.tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
-    {
-      id: '67movies', category: 'frontend', label: '67Movies', featured: false,
-      gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://67movies.net/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 67Movies${linkExternalTabArrow()}</a><br/>`,
-    },
 
     /* ---- Torrent Sites ---- */
     {
-      id: '1337x', category: 'sites', label: '1337x.to (+ Mirrors)', featured: true,
+      id: 'YTS',
+      category: 'sites',
+      label: 'YTS',
+      featured: true,
+      appliesTo: ['movie'],
       gate: 'enableTorrentSiteShortcuts',
-      renderHtml: (c) => `<a href="https://1337x.to/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>1337x.to${linkExternalTabArrow()}</a> - <a href="https://1337x.st/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://x1337x.cc/category-search/${c.title}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => !c.ytsTorrentPageUrl ? '' :
+        `<a href="${c.ytsTorrentPageUrl}" ${linkTargetAttr()} ${accentStyle()}>YTS${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: '1337x', category: 'sites', label: '1337x.st (+ Mirrors)', featured: true,
+      gate: 'enableTorrentSiteShortcuts',
+      renderHtml: (c) => {
+        const q = encodeURIComponent(c.torrentSearchTitle);
+        return `<a href="https://1337x.st/category-search/${q}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>1337x.st${linkExternalTabArrow()}</a> - <a href="https://1337x.to/category-search/${q}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 1${linkExternalTabArrow()}</a> - <a href="https://x1337x.cc/category-search/${q}/${c.vidType1337}/1/" ${linkTargetAttr()} ${accentStyle()}>Mirror 2${linkExternalTabArrow()}</a><br/>`;
+      },
     },
     {
       id: 'eztv', category: 'sites', label: 'EZTVx.to (TV only, + Mirrors)', featured: false,
@@ -340,7 +353,10 @@
     {
       id: 'knaben', category: 'sites', label: 'Knaben.org (with SxE for TV)', featured: false,
       gate: 'enableTorrentSiteShortcuts',
-      renderHtml: (c) => `<a href="https://knaben.org/search/${encodeURIComponent(c.title)}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>Knaben.org${linkExternalTabArrow()}</a>${c.Type === 'tv' ? ` - <a data-tm-sxe-link="1" href="https://knaben.org/search/${encodeURIComponent(`${c.title} ${c.sxe}`)}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>${c.sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>`,
+      renderHtml: (c) => {
+        const baseQ = encodeURIComponent(c.torrentSearchTitle);
+        return `<a href="https://knaben.org/search/${baseQ}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>Knaben.org${linkExternalTabArrow()}</a>${c.Type === 'tv' ? ` - <a data-tm-sxe-link="1" href="https://knaben.org/search/${encodeURIComponent(`${c.title} ${c.sxe}`)}/${c.knabenCategory}/1/seeders" ${linkTargetAttr()} ${accentStyle()}>${c.sxe.toUpperCase()}${linkExternalTabArrow()}</a>` : ''}<br/>`;
+      },
     },
     {
       id: 'extto', category: 'sites', label: 'Ext.to (with SxE for TV)', featured: false,
@@ -350,17 +366,20 @@
     {
       id: 'tpb', category: 'sites', label: 'ThePirateBay.org', featured: false,
       gate: 'enableTorrentSiteShortcuts',
-      renderHtml: (c) => `<a href="https://thepiratebay.org/search.php?q=${c.title}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} ${accentStyle()}>ThePirateBay.org${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) =>
+        `<a href="https://thepiratebay.org/search.php?q=${encodeURIComponent(c.torrentSearchTitle)}&video=on&search=Pirate+Search&page=0" ${linkTargetAttr()} ${accentStyle()}>ThePirateBay.org${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'extratorrent', category: 'sites', label: 'ExtraTorrent.st', featured: false,
       gate: 'enableTorrentSiteShortcuts',
-      renderHtml: (c) => `<a href="https://extratorrent.st/search/?new=1&search=${c.title}&s_cat=${c.ET_cat}" ${linkTargetAttr()} ${accentStyle()}>ExtraTorrent.st${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) =>
+        `<a href="https://extratorrent.st/search/?new=1&search=${encodeURIComponent(c.torrentSearchTitle)}&s_cat=${c.ET_cat}" ${linkTargetAttr()} ${accentStyle()}>ExtraTorrent.st${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'rutor', category: 'sites', label: 'Rutor.is', featured: false,
       gate: 'enableTorrentSiteShortcuts',
-      renderHtml: (c) => `<a href="https://rutor.is/search/${c.title}" ${linkTargetAttr()} ${accentStyle()}>Rutor.is${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) =>
+        `<a href="https://rutor.is/search/${encodeURIComponent(c.torrentSearchTitle)}" ${linkTargetAttr()} ${accentStyle()}>Rutor.is${linkExternalTabArrow()}</a><br/>`,
     },
   ];
 
@@ -433,9 +452,10 @@
   const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
-    <h4 style="color: #11dd11;">Extension took a lot of space in your browser? SAY NO MORE! Now you can control the display of the card from settings panel</h4>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>UI optimizations and improvements</li>
+      <li>Added YTS Torrent Site</li>
+      <li>Updated links to latest versions</li>
+      <li>Updated torrent search titles to include year</li>
     </ul>
   `;
 
@@ -472,7 +492,7 @@
   function saveSettings(s) { GM_setValue('tmdb_settings', JSON.stringify(s)); }
 
   let SETTINGS = loadSettings();
-  let lastInfoCardRender = null; // { data, torrents, imdb, season, episode, ytsLanguage, peekSubmode }
+  let lastInfoCardRender = null; // { data, torrents, imdb, season, episode, ytsLanguage, episodeDisplayName, ytsPageUrl, peekSubmode }
   let lastChangeResultCandidates = null; // array of TMDb search results for "Change result" dropdown
 
   /* Apply theme immediately on load */
@@ -527,7 +547,8 @@
         lastInfoCardRender.season,
         lastInfoCardRender.episode,
         lastInfoCardRender.ytsLanguage,
-        lastInfoCardRender.episodeDisplayName
+        lastInfoCardRender.episodeDisplayName,
+        lastInfoCardRender.ytsPageUrl,
       );
     } catch (e) { /* ignore */ }
     if (overlayInner && overlayInner.isConnected) {
@@ -2234,6 +2255,42 @@
    * UI: Info Box Renderer
    * Inline link colours now reference CSS custom properties via inline style.
    * -------------------------------------------------- */
+  function inferTmdbMediaType(data) {
+    if (!data) return null;
+    if (data.media_type === 'movie' || data.media_type === 'tv') return data.media_type;
+    if (data.title && !data.name) return 'movie';
+    if (data.name && !data.title) return 'tv';
+    return null;
+  }
+
+  /** TMDb has no standalone year — movies use release_date, TV uses first_air_date. */
+  function getTmdbDateField(data, mediaType) {
+    if (!data) return '';
+    const raw = mediaType === 'tv'
+      ? (data.first_air_date || data.release_date || '')
+      : (data.release_date || data.first_air_date || '');
+    return String(raw).trim();
+  }
+
+  function getTmdbYear(data, mediaType) {
+    const m = getTmdbDateField(data, mediaType).match(/^(\d{4})/);
+    return m ? m[1] : '';
+  }
+
+  async function normalizeTmdbSearchResult(result) {
+    if (!result || result.id == null) return result;
+    const mediaType = inferTmdbMediaType(result);
+    if (!mediaType) return result;
+    let merged = { ...result, media_type: mediaType };
+    if (getTmdbYear(merged, mediaType)) return merged;
+    try {
+      const apiKey = getNextApiKey();
+      const full = await tmdbApiGetJson(`https://api.themoviedb.org/3/${mediaType}/${result.id}?api_key=${apiKey}`);
+      merged = { ...merged, ...full, media_type: mediaType };
+    } catch { /* keep search payload */ }
+    return merged;
+  }
+
   function slugifyForTraktPath(str) {
     const s = String(str || '')
       .normalize('NFKD')
@@ -2441,11 +2498,13 @@
     return `<div class="tmdb-card-toolbar" role="toolbar" aria-label="Display mode">${btns}</div>`;
   }
 
-  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null, episodeDisplayName = null) {
+  function renderInfoBox(data, torrents = null, imdb = null, specifiedSeason = null, specifiedEpisode = null, ytsLanguage = null, episodeDisplayName = null, ytsPageUrl = null) {
     const tmdbID = data.id;
     const title = data.title || data.name || 'Unknown Title';
-    const date = data.release_date || data.first_air_date || 'Unknown Date';
-    const Type = data.media_type || 'Unknown';
+    const Type = inferTmdbMediaType(data) || 'Unknown';
+    const date = getTmdbDateField(data, Type) || 'Unknown Date';
+    const tmdbYear = getTmdbYear(data, Type);
+    const torrentSearchTitle = tmdbYear ? `${title} ${tmdbYear}` : title;
 
     let vidType = '';
     let vidType1337 = '';
@@ -2500,7 +2559,7 @@
     /* Preserve the prior peekSubmode so re-renders keep the user's expanded state. */
     const prevPeek = lastInfoCardRender ? lastInfoCardRender.peekSubmode : null;
     lastInfoCardRender = {
-      data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage, episodeDisplayName,
+      data, torrents, imdb, season: season_number, episode: episode_number, ytsLanguage, episodeDisplayName, ytsPageUrl,
       peekSubmode: prevPeek || null,
     };
 
@@ -2518,10 +2577,19 @@
       effectiveSubmode = surfaceCfg.inlineSubmode;
     }
 
+    const ytsTorrentPageUrl = (() => {
+      if (Type !== 'movie' || !ytsPageUrl || !Array.isArray(torrents) || !torrents.length) return '';
+      const raw = String(ytsPageUrl);
+      if (/^https?:\/\//i.test(raw)) return raw;
+      if (raw.startsWith('/')) return `https://yts.bz${raw}`;
+      return `https://yts.bz/${raw}`;
+    })();
+
     const ctx = {
-      tmdbID, title, date, Type, vidType, vidType1337, ET_cat,
+      tmdbID, title, date, tmdbYear, torrentSearchTitle, Type, vidType, vidType1337, ET_cat,
       query, smashQuery, multiQuery, sxe, knabenCategory, extCategory,
       imdb, traktUrls, stremioHref,
+      ytsTorrentPageUrl,
     };
 
     const ytsMagnetsHtml = buildYtsMagnetsHtml(ctx, torrents, ytsLanguage);
@@ -2867,15 +2935,17 @@
 
   async function processSearchResult(result, specifiedSeason = null, specifiedEpisode = null, episodeDisplayName = null, seriesImdbForLinks = null) {
     const tmdbURL = `https://api.themoviedb.org/3/`;
-    const ytsAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
-    const ytsAltAPI = `https://movies-api.accel.li/api/v2/list_movies.json?query_term=`;
+    const ytsAPI = `https://movies-api.accel.li/api/v2/list_movies.json?query_term=`;
+    const ytsAltAPI = `https://yts.bz/api/v2/list_movies.json?query_term=`;
     try {
+      result = await normalizeTmdbSearchResult(result);
+
       const existing = getMountTarget().querySelector('.tmdb-info-card');
       if (existing) existing.remove();
 
       const apiKey = getNextApiKey();
       let imdbIdFromPage = null;
-      if (isImdb) { imdbIdFromPage = location.pathname.match(/title\/(tt\d+)/)?.[1]; }
+      if (isImdb) { imdbIdFromPage = location.pathname.match(/title\/ (tt\d+)/)?.[1]; }
       let imdb_id = null;
       const seriesImdbNorm = seriesImdbForLinks && String(seriesImdbForLinks).trim() ? String(seriesImdbForLinks).trim() : null;
       if (seriesImdbNorm) {
@@ -2906,7 +2976,8 @@
               if (imdb_id) ytsMovieListCache.set(imdb_id, magnetData);
             }
             if (magnetData.status === 'ok' && magnetData.data.movie_count > 0) {
-              renderInfoBox(result, magnetData.data.movies[0].torrents, imdb_id, specifiedSeason, specifiedEpisode, magnetData.data.movies[0].language, episodeDisplayName);
+              const ytsMovie = magnetData.data.movies[0];
+              renderInfoBox(result, ytsMovie.torrents, imdb_id, specifiedSeason, specifiedEpisode, ytsMovie.language, episodeDisplayName, ytsMovie.url);
             } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
           } catch { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
         } else { renderInfoBox(result, null, imdb_id, specifiedSeason, specifiedEpisode, null, episodeDisplayName); }
@@ -3214,6 +3285,8 @@
       const tv = json.tv_results?.[0];
       const tvep = json.tv_episode_results?.[0];
       let result = movie || tv;
+      if (movie) result.media_type = 'movie';
+      else if (tv) result.media_type = 'tv';
       let season = null;
       let episode = null;
       let episodeTitle = null;
@@ -3715,7 +3788,8 @@
     const fakeResult = {
       id: data.id,
       media_type: data.media_type,
-      title: data.title || data.name,
+      title: data.title,
+      name: data.name,
       release_date: data.release_date,
       first_air_date: data.first_air_date,
       external_imdb: data.external_imdb || null,
