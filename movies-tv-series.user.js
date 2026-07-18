@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.2
+// @version      1.9.3
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -252,14 +252,14 @@
       renderHtml: (c) => `<a href="https://multiembed.mov/?video_id=${c.tmdbID}&tmdb=1${c.multiQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on MultiEmbed.mov${linkExternalTabArrow()}</a><br/>`,
     },
     {
-      id: '111movies', category: 'stream', label: '111Movies.net', featured: false,
+      id: 'vidlove', category: 'stream', label: 'VidLove.cc', featured: false,
       gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://111movies.net/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://player.vidlove.cc/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on 111Movies.net${linkExternalTabArrow()}</a><br/>`,
     },
     {
-      id: 'vidfast', category: 'stream', label: 'VidFast.pro', featured: false,
+      id: 'vidfast', category: 'stream', label: 'VidFast.vc', featured: false,
       gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://vidfast.pro/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://vidfast.vc/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidFast.pro${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'vidrock', category: 'stream', label: 'VidRock.ru', featured: false,
@@ -291,7 +291,7 @@
     {
       id: 'fmovies', category: 'frontend', label: 'FMovies', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://www.fmovies.nz/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on FMovies${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://www.fmovies.gd/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on FMovies${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'shuttletv', category: 'frontend', label: 'ShuttleTV', featured: false,
@@ -453,9 +453,7 @@
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Added YTS Torrent Site</li>
       <li>Updated links to latest versions</li>
-      <li>Updated torrent search titles to include year</li>
     </ul>
   `;
 
