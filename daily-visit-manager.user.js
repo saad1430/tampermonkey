@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Daily Visit Manager
 // @namespace    http://github.com/saad1430/tampermonkey
-// @version      1.1.1
+// @version      1.1.2
 // @description  Automatically opens configured sites once per day on first interaction. Manage sites via the floating UI panel.
 // @updateURL    https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
 // @downloadURL  https://github.com/saad1430/tampermonkey/raw/main/daily-visit-manager.user.js
@@ -16,6 +16,41 @@
 
 (function () {
     'use strict';
+
+    /* Trusted Types: some sites reject string innerHTML (e.g. app.trakt.tv). */
+    let trustedHtmlPolicy = null;
+    function getTrustedHtmlPolicy() {
+        if (trustedHtmlPolicy) return trustedHtmlPolicy;
+        const tt = typeof globalThis.trustedTypes !== 'undefined' ? globalThis.trustedTypes : null;
+        if (!tt || typeof tt.createPolicy !== 'function') return null;
+        try {
+            trustedHtmlPolicy = tt.createPolicy('daily-visit-manager', { createHTML: (s) => String(s ?? '') });
+            return trustedHtmlPolicy;
+        } catch { /* name blocked or already created */ }
+        if (tt.defaultPolicy) {
+            trustedHtmlPolicy = tt.defaultPolicy;
+            return trustedHtmlPolicy;
+        }
+        return null;
+    }
+    function toTrustedHtml(html) {
+        const s = String(html ?? '');
+        try {
+            const p = getTrustedHtmlPolicy();
+            if (p && typeof p.createHTML === 'function') return p.createHTML(s);
+        } catch { /* ignore */ }
+        return s;
+    }
+    function setHtml(el, html) {
+        if (!el) return;
+        el.innerHTML = toTrustedHtml(html);
+    }
+    function svgEl(tag, attrs, children) {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+        (children || []).forEach((c) => el.appendChild(c));
+        return el;
+    }
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -149,7 +184,7 @@
             opacity:0; transition:opacity 0.25s, transform 0.25s;
             max-width:340px; text-align:center; pointer-events:none;
         `;
-        toast.innerHTML = htmlMsg;
+        toast.innerHTML = toTrustedHtml(htmlMsg);
         document.body.appendChild(toast);
         requestAnimationFrame(() => {
             toast.style.opacity = '1';
@@ -421,11 +456,24 @@
     // ─── FAB Icon ─────────────────────────────────────────────────────────────
 
     function updateFabIcon(fab) {
+        fab.replaceChildren();
         if (isPaused()) {
-            fab.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+            fab.appendChild(svgEl('svg', {
+                width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none',
+                stroke: '#fff', 'stroke-width': '2.5', 'stroke-linecap': 'round',
+            }, [
+                svgEl('rect', { x: '6', y: '4', width: '4', height: '16' }),
+                svgEl('rect', { x: '14', y: '4', width: '4', height: '16' }),
+            ]));
             fab.classList.add('paused');
         } else {
-            fab.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+            fab.appendChild(svgEl('svg', {
+                width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none',
+                stroke: '#fff', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+            }, [
+                svgEl('circle', { cx: '12', cy: '12', r: '10' }),
+                svgEl('polyline', { points: '12 6 12 12 16 14' }),
+            ]));
             fab.classList.remove('paused');
         }
     }
@@ -463,7 +511,7 @@
             const at = new Date(pauseUntil());
             const hh = String(at.getHours()).padStart(2,'0');
             const mm = String(at.getMinutes()).padStart(2,'0');
-            text.innerHTML = `Paused — resumes at <span>${hh}:${mm}</span>`;
+            setHtml(text, `Paused — resumes at <span>${hh}:${mm}</span>`);
             btn.textContent = '▶ Resume';
             btn.className = 'dvm-btn dvm-btn-primary';
         } else {
@@ -586,11 +634,11 @@
         const sites = getSites();
 
         if (sites.length === 0) {
-            list.innerHTML = `<div class="dvm-empty">No sites yet.<br/>Click <strong>+ Add Site</strong> to get started.</div>`;
+            setHtml(list, `<div class="dvm-empty">No sites yet.<br/>Click <strong>+ Add Site</strong> to get started.</div>`);
             return;
         }
 
-        list.innerHTML = sites.map(site => `
+        setHtml(list, sites.map(site => `
             <div class="dvm-site-row ${site.active ? '' : 'inactive'}" data-id="${site.id}">
                 <div class="dvm-site-info">
                     <div class="dvm-site-name">${escHtml(site.name)}</div>
@@ -608,7 +656,7 @@
                 <button class="dvm-btn dvm-btn-icon dvm-edit-btn" title="Edit URL / Reset time" data-id="${site.id}">✎</button>
                 <button class="dvm-btn dvm-btn-danger dvm-delete-btn" data-id="${site.id}">✕</button>
             </div>
-        `).join('');
+        `).join(''));
 
         list.querySelectorAll('.dvm-toggle-active').forEach(el => {
             el.addEventListener('change', () => {
@@ -807,7 +855,7 @@
         // Panel
         const panel = document.createElement('div');
         panel.id = 'dvm-panel';
-        panel.innerHTML = `
+        setHtml(panel, `
             <div class="dvm-header">
                 <span class="dvm-title">${escHtml(scriptName)}${scriptVersion ? ` <span class="dvm-ver">(v${escHtml(String(scriptVersion))})</span>` : ''}</span>
                 <div class="dvm-header-actions">
@@ -869,7 +917,7 @@
                 <div style="flex:1"></div>
                 <button class="dvm-btn dvm-btn-ghost" id="dvm-hide-fab-btn">🙈 Hide floating button</button>
             </div>
-        `;
+        `);
 
         document.body.appendChild(fab);
         document.body.appendChild(panel);
@@ -877,13 +925,13 @@
         // FAB right-click menu
         const fabMenu = document.createElement('div');
         fabMenu.id = 'dvm-fab-menu';
-        fabMenu.innerHTML = `
+        setHtml(fabMenu, `
             <button class="dvm-menu-item" id="dvm-m-open"><span>Open configuration</span><span class="dvm-menu-muted">Ctrl+Alt+A</span></button>
             <button class="dvm-menu-item" id="dvm-m-pause"><span>Pause / Resume</span><span class="dvm-menu-muted">Ctrl+Alt+S</span></button>
             <button class="dvm-menu-item" id="dvm-m-add-current"><span>Add current site</span><span class="dvm-menu-muted">quick</span></button>
             <button class="dvm-menu-item" id="dvm-m-add-new"><span>Add new site</span><span class="dvm-menu-muted">form</span></button>
             <button class="dvm-menu-item dvm-menu-danger" id="dvm-m-hide"><span>Hide floating button</span><span class="dvm-menu-muted">✕</span></button>
-        `;
+        `);
         document.body.appendChild(fabMenu);
 
         makeDraggable(fab, panel);
