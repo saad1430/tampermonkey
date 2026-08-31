@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.5
+// @version      1.9.6
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -496,10 +496,10 @@
   const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
-    <h3>Goodbye Cineby</h3>
+    <h3 style="margin:0 0 10px 0;">Farewell <a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></h3>
     <ul style="margin-left:20px; line-height:1.5;">
       <li>New links: <b>CineJoy</b> and <b>BingeBox</b></li>
-      <li>Goodbye <b>Cineby</b>... It was great while it lasted 😭</li>
+      <li>Goodbye <b><a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></b>... It was great while it lasted 😭</li>
     </ul>
   `;
 
