@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.4
+// @version      1.9.5
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -308,9 +308,14 @@
 
     /* ---- Frontends ---- */
     {
-      id: 'cineby', category: 'frontend', label: 'Cineby (+ More Info)', featured: true,
-      gate: 'enableFrontendLinks',
+      id: 'cineby', category: 'frontend', label: 'Cineby (+ More Info)', featured: false,
+      gate: 'disabledLinks',
       renderHtml: (c) => `<a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a> <a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: 'cinejoy', category: 'frontend', label: 'CineJoy (+ More Info)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://cinejoy.to/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.to/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
       id: 'pstream', category: 'frontend', label: 'Aether (4K possible)', featured: true,
@@ -323,14 +328,14 @@
       },
     },
     {
+      id: 'bingebox', category: 'frontend', label: 'BingeBox (+ More Info)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://bingebox.ac/watch/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on Bingebox${linkExternalTabArrow()}</a> <a href="https://bingebox.ac/${c.vidType === 'tv' ? 'show' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
       id: 'fmovies', category: 'frontend', label: 'FMovies', featured: false,
       gate: 'disabledLinks',
       renderHtml: (c) => `<a href="https://www.fmovies.gd/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on FMovies${linkExternalTabArrow()}</a><br/>`,
-    },
-    {
-      id: 'cinejoy', category: 'frontend', label: 'CineJoy (+ More Info)', featured: true,
-      gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://cinejoy.to/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.to/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
       id: 'shuttletv', category: 'frontend', label: 'ShuttleTV', featured: false,
@@ -491,10 +496,10 @@
   const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
+    <h3>Goodbye Cineby</h3>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>Trakt: Title matching updated to new format</li>
-      <li>Updated Aether and RiveStream links</li>
-      <li>Added additional links as <b>Cineby</b> is about to shut down 😭</li>
+      <li>New links: <b>CineJoy</b> and <b>BingeBox</b></li>
+      <li>Goodbye <b>Cineby</b>... It was great while it lasted 😭</li>
     </ul>
   `;
 
