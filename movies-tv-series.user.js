@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.9.6
+// @version      1.10.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -251,9 +251,9 @@
   const LINKS = [
     /* ---- Streaming (single anchor per row) ---- */
     {
-      id: 'videasy', category: 'stream', label: 'VidEasy.to (recommended)', featured: true,
+      id: 'vidy', category: 'stream', label: 'Vidy.st (recommended)', featured: true,
       gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://player.videasy.to/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.to (recommended)${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://www.vidy.st/${c.vidType}/${c.tmdbID}${c.query}?color=FF0000${c.vidType === 'tv' ? '&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true' : ''}" ${linkTargetAttr()} ${accentStyle()}>Watch on Vidy.st (recommended)${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'cinemaos-tech', category: 'stream', label: 'CinemaOS.tech (fastest)', featured: true,
@@ -264,6 +264,11 @@
       id: 'cinesrc', category: 'stream', label: 'CineSrc.st (with Direct Download)', featured: false,
       gate: 'enableStreamingLinks',
       renderHtml: (c) => `<a href="https://cinesrc.st/embed/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineSrc.st${linkExternalTabArrow()}</a> (Supports <a href="https://cinesrc.st/download/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Direct Download</a>)<br/>`,
+    },
+    {
+      id: 'videasy', category: 'stream', label: 'VidEasy.to', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://player.videasy.to/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.to (recommended)${linkExternalTabArrow()}</a><br/>`,
     },
     {
       id: 'vidking', category: 'stream', label: 'VidKing.net', featured: false,
@@ -308,14 +313,9 @@
 
     /* ---- Frontends ---- */
     {
-      id: 'cineby', category: 'frontend', label: 'Cineby (+ More Info)', featured: false,
-      gate: 'disabledLinks',
-      renderHtml: (c) => `<a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Cineby${linkExternalTabArrow()}</a> <a href="https://www.cineby.at/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
-    },
-    {
-      id: 'cinejoy', category: 'frontend', label: 'CineJoy (+ More Info)', featured: true,
+      id: 'cineby', category: 'frontend', label: 'Movy (+ More Info)', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://cinejoy.to/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.to/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+      renderHtml: (c) => `<a href="https://www.movy.sx/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Movy${linkExternalTabArrow()}</a> <a href="https://www.movy.sx/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
       id: 'pstream', category: 'frontend', label: 'Aether (4K possible)', featured: true,
@@ -328,7 +328,12 @@
       },
     },
     {
-      id: 'bingebox', category: 'frontend', label: 'BingeBox (+ More Info)', featured: true,
+      id: 'cinejoy', category: 'frontend', label: 'CineJoy (+ More Info)', featured: true,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://cinejoy.to/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.to/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: 'bingebox', category: 'frontend', label: 'BingeBox (+ More Info)', featured: false,
       gate: 'enableFrontendLinks',
       renderHtml: (c) => `<a href="https://bingebox.ac/watch/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on Bingebox${linkExternalTabArrow()}</a> <a href="https://bingebox.ac/${c.vidType === 'tv' ? 'show' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
@@ -498,7 +503,7 @@
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
     <h3 style="margin:0 0 10px 0;">Farewell <a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></h3>
     <ul style="margin-left:20px; line-height:1.5;">
-      <li>New links: <b>CineJoy</b> and <b>BingeBox</b></li>
+      <li>Updated links to FMHY recommendations</li>
       <li>Goodbye <b><a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></b>... It was great while it lasted 😭</li>
     </ul>
   `;
