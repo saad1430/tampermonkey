@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript that surfaces streaming links, torrent options, trailers, and metadata for any movie or TV show — right from your **Google**, **Bing**, **Brave**, or **DuckDuckGo** search results, **IMDb**, **Trakt**, **Simkl**, **TMDb** title pages, or **YTS**.
 
-**Current version:** `1.10.0` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
+**Current version:** `1.11.0` (see `@version` in [`movies-tv-series.user.js`](movies-tv-series.user.js)) &nbsp;|&nbsp; **Author:** [Saad1430](https://github.com/saad1430) &nbsp;|&nbsp; **License:** [MIT](LICENSE) &nbsp;|&nbsp; **[Disclaimer](DISCLAIMER.md)**
 
 ---
 
@@ -182,6 +182,7 @@ This repo also contains a few personal-use scripts:
 - `swiftuploads-download-automation.user.js` — Download automation for SwiftUploads
 - `yts-enhancer.user.js` — Extra enhancements for YTS pages
 - `daily-visit-manager.user.js` — Opens configured URLs once per day after your first click or keypress on any page; manage the list, domain vs exact URL matching, and a pause timer from a floating panel
+- `downloader-frontend.user.js` - Opens example.com#downloader and lists movie or TV episode download links. (Can be integrated into `movies-tv-series.user.js` later)
 
 These are personal backups and not actively maintained or documented.
 

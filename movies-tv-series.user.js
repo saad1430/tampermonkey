@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Movie/TV Shows Links Aggregator
 // @namespace    http://tampermonkey.net/
-// @version      1.10.0
+// @version      1.11.0
 // @description  Shows TMDb/IMDb IDs, optional streaming/torrent links, and includes a Shift+R settings panel to toggle features.
 // @icon         https://raw.githubusercontent.com/saad1430/tampermonkey/refs/heads/main/icons/movies-tv-shows-search-100.png
 // @author       Saad1430
@@ -266,16 +266,6 @@
       renderHtml: (c) => `<a href="https://cinesrc.st/embed/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineSrc.st${linkExternalTabArrow()}</a> (Supports <a href="https://cinesrc.st/download/${c.vidType}/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Direct Download</a>)<br/>`,
     },
     {
-      id: 'videasy', category: 'stream', label: 'VidEasy.to', featured: false,
-      gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://player.videasy.to/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidEasy.to (recommended)${linkExternalTabArrow()}</a><br/>`,
-    },
-    {
-      id: 'vidking', category: 'stream', label: 'VidKing.net', featured: false,
-      gate: 'enableStreamingLinks',
-      renderHtml: (c) => `<a href="https://www.vidking.net/embed/${c.vidType}/${c.tmdbID}${c.query}?color=e50914" ${linkTargetAttr()} ${accentStyle()}>Watch on VidKing.net${linkExternalTabArrow()}</a><br/>`,
-    },
-    {
       id: 'vsembed', category: 'stream', label: 'VsEmbed.ru', featured: false,
       gate: 'enableStreamingLinks',
       renderHtml: (c) => `<a href="https://vsembed.ru/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VsEmbed.ru${linkExternalTabArrow()}</a><br/>`,
@@ -306,9 +296,24 @@
       renderHtml: (c) => `<a href="https://vidlink.pro/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidLink.pro${linkExternalTabArrow()}</a><br/>`,
     },
     {
-      id: 'vidsrc', category: 'stream', label: 'VidSrc.to (legacy / often broken)', featured: false,
-      gate: 'disabledLinks',
+      id: 'cinezo', category: 'stream', label: 'CineZo.live', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://player.cinezo.live/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineZo.live${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidsrc', category: 'stream', label: 'VidSrc.to (legacy)', featured: false,
+      gate: 'enableStreamingLinks',
       renderHtml: (c) => `<a href="https://vidsrc.to/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.to${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidsrc2', category: 'stream', label: 'VidSrc.sh', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vidsrc.sh/embed/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidSrc.sh${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'vidup', category: 'stream', label: 'VidUp.to', featured: false,
+      gate: 'enableStreamingLinks',
+      renderHtml: (c) => `<a href="https://vidup.to/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on VidUp.to${linkExternalTabArrow()}</a><br/>`,
     },
 
     /* ---- Frontends ---- */
@@ -318,19 +323,19 @@
       renderHtml: (c) => `<a href="https://www.movy.sx/${c.vidType}/${c.tmdbID}${c.query}?play=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Movy${linkExternalTabArrow()}</a> <a href="https://www.movy.sx/${c.vidType}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
-      id: 'pstream', category: 'frontend', label: 'Aether (4K possible)', featured: true,
+      id: 'pstream', category: 'frontend', label: 'P-Stream (4K possible)', featured: true,
       gate: 'enableFrontendLinks',
       renderHtml: (c) => {
         const path = `/media/tmdb-${c.vidType}-${c.tmdbID}`;
         const tv = c.vidType === 'tv' ? '1' : '';
         const a = (host, label) => `<a href="https://${host}${path}" ${linkTargetAttr()} ${accentStyle()} data-tm-pstream-tv="${tv}">${label}${linkExternalTabArrow()}</a>`;
-        return `${a('aether.bar', 'Watch on Aether')} ${a('aether.ist', '(Mirror)')} ${a('zstream.mov', '(Z-Stream)')} <small>(4K possible)</small><br/>`;
+        return `${a('cinecat.eu', 'Watch on Z-Stream/CineCat')} - ${a('aether.ist', 'Aether')} - ${a('pstream.cfd', 'P-Stream')} <small>(4K - OpenSource)</small><br/>`;
       },
     },
     {
       id: 'cinejoy', category: 'frontend', label: 'CineJoy (+ More Info)', featured: true,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://cinejoy.to/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.to/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+      renderHtml: (c) => `<a href="https://cinejoy.pk/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on CineJoy${linkExternalTabArrow()}</a> <a href="https://cinejoy.pk/${c.vidType === 'tv' ? 'series' : 'movie'}/${c.tmdbID}" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
     },
     {
       id: 'bingebox', category: 'frontend', label: 'BingeBox (+ More Info)', featured: false,
@@ -343,9 +348,9 @@
       renderHtml: (c) => `<a href="https://www.fmovies.gd/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on FMovies${linkExternalTabArrow()}</a><br/>`,
     },
     {
-      id: 'shuttletv', category: 'frontend', label: 'ShuttleTV', featured: false,
+      id: 'shuttletv', category: 'frontend', label: 'ShuttleTV (Mirrors)', featured: false,
       gate: 'enableFrontendLinks',
-      renderHtml: (c) => `<a href="https://shuttletv.su/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a><br/>`,
+      renderHtml: (c) => `<a href="https://shuttletv.su/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Watch on ShuttleTV${linkExternalTabArrow()}</a> - <a href="https://shuttletv.pk/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Mirror 1</a> - <a href="https://shuttletv.me/watch/${c.tmdbID}${c.smashQuery}" ${linkTargetAttr()} ${accentStyle()}>Mirror 2</a><br/>`,
     },
     {
       id: '67movies', category: 'frontend', label: '67Movies', featured: false,
@@ -366,6 +371,16 @@
       id: 'hexa', category: 'frontend', label: 'Hexa (+ More Info)', featured: false,
       gate: 'enableFrontendLinks',
       renderHtml: (c) => `<a href="https://hexa.su/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Hexa${linkExternalTabArrow()}</a> <a href="https://hexa.su/details/${c.vidType}/${c.tmdbID}/" ${linkTargetAttr()} ${accentStyle()}>(More Info)</a><br/>`,
+    },
+    {
+      id: 'atlantic', category: 'frontend', label: 'Atlantic', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://atlantic.st/watch/${c.vidType}/${c.tmdbID}${c.query}" ${linkTargetAttr()} ${accentStyle()}>Watch on Atlantic${linkExternalTabArrow()}</a><br/>`,
+    },
+    {
+      id: 'mapple', category: 'frontend', label: 'Mapple', featured: false,
+      gate: 'enableFrontendLinks',
+      renderHtml: (c) => `<a href="https://mapple.fun/watch/${c.vidType}/${c.tmdbID}${c.query}?nextButton=true&autoPlay=true&autoNext=true" ${linkTargetAttr()} ${accentStyle()}>Watch on Mapple${linkExternalTabArrow()}</a><br/>`,
     },
 
     /* ---- Torrent Sites ---- */
@@ -501,10 +516,9 @@
   const ANNOUNCEMENT_VERSION = GM_info.script.version;
   const ANNOUNCEMENT_MESSAGE = `
     <h2 style="margin:0 0 10px 0;">What's New in v${ANNOUNCEMENT_VERSION}</h2>
-    <h3 style="margin:0 0 10px 0;">Farewell <a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></h3>
     <ul style="margin-left:20px; line-height:1.5;">
       <li>Updated links to FMHY recommendations</li>
-      <li>Goodbye <b><a href="https://www.cineby.at/goodbye" target="_blank" rel="noopener">Cineby</a></b>... It was great while it lasted 😭</li>
+      <li>Added a lot of new sites and updated some old URLs</li>
     </ul>
   `;
 
@@ -2219,7 +2233,7 @@
 
   /** P-Stream / Aether TV URLs use TMDB season row id and episode row id: /media/tmdb-tv-{showId}/{seasonId}/{episodeId} (not S/E numbers). */
   function isAetherPstreamHost(hostname) {
-    return /^(?:www\.)?(?:pstream\.net|aether\.bar|aether\.ist|zstream\.mov)$/i.test(hostname || '');
+    return /^(?:www\.)?(?:pstream\.cfd|cinecat\.eu|aether\.ist)$/i.test(hostname || '');
   }
 
   function extractPstreamTvIdsFromSeasonJson(sJson, episodeNum) {
